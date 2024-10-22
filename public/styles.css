@@ -12,11 +12,18 @@ h1 {
     margin-bottom: 20px;
 }
 
-canvas {
-    border: 1px solid black;
-    margin: 20px;
-}
-
 div {
     margin-bottom: 20px;
+}
+
+.canvas-container {
+    display: flex;  /* Flexbox layout to align canvases side by side */
+    justify-content: space-around;
+    align-items: center;
+    margin-top: 20px;
+}
+
+canvas {
+    border: 1px solid black;
+    margin: 10px;
 }
