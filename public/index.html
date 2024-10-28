@@ -9,11 +9,32 @@
 <body>
     <h1>Voronoi Diagram Visualizer</h1>
 
-    <!-- Container for the canvases -->
-    <div class="canvas-container">
-        <canvas id="main-canvas"></canvas>
-    </div>
+    
+    <!-- Container for the canvas and table -->
+    <div class="canvas-table-container">
+        <div class="canvas-container">
+            <canvas id="main-canvas"></canvas>
+        </div>
+        <div class="table-container">
+            <h2>Point Coordinates</h2>
+            <!-- Clear Button -->
+            <button id="clear-button">Clear All Points</button>
+            <button id="add-random-button">Add random point</button>
 
+            <table id="points-table">
+                <thead>
+                    <tr>
+                        <th>Point</th>
+                        <th>X</th>
+                        <th>Y</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <!-- Rows will be populated by JavaScript -->
+                </tbody>
+            </table>
+        </div>
+    </div>
     <script src="script.js"></script>
 </body>
 </html>
