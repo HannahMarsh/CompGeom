@@ -4,56 +4,61 @@ const points = [];
 const pointRadius = 5;
 let draggingPoint = null;
 
-// Set canvas width and height based on its CSS-defined size
 canvas.width = canvas.clientWidth;
 canvas.height = canvas.clientHeight;
 
+// Function to compute and draw Voronoi diagram
+function drawVoronoi() {
+    //console.log("Drawing Voronoi diagram...");
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    drawPoints();
+
+    if (points.length > 1) {
+        const voronoi = d3.voronoi()
+            .extent([[0, 0], [canvas.width, canvas.height]])
+            .polygons(points.map(p => [p.x, p.y]));
+
+        voronoi.forEach((cell, index) => {
+            ctx.beginPath();
+            if (cell) {
+                ctx.moveTo(cell[0][0], cell[0][1]);
+                cell.forEach(([x, y]) => ctx.lineTo(x, y));
+                ctx.closePath();
+                ctx.strokeStyle = 'gray';
+                ctx.stroke();
+            }
+           // console.log(`Voronoi cell for point ${index + 1} drawn.`);
+        });
+    }
+}
+
 // Function to draw all points
 function drawPoints() {
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    points.forEach(point => {
+   // console.log("Drawing points on canvas...");
+    points.forEach((point, index) => {
         ctx.beginPath();
         ctx.arc(point.x, point.y, pointRadius, 0, 2 * Math.PI);
         ctx.fillStyle = "blue";
         ctx.fill();
         ctx.stroke();
+        //console.log(`Point ${index + 1} drawn at (${point.x}, ${point.y}).`);
     });
 }
 
 // Function to update the coordinates table
 function updateTable() {
+    //console.log("Updating points table...");
     const tableBody = document.getElementById("points-table").querySelector("tbody");
-    tableBody.innerHTML = ""; // Clear the table
-
+    tableBody.innerHTML = "";
     points.forEach((point, index) => {
         const row = document.createElement("tr");
-        
-        const cellIndex = document.createElement("td");
-        cellIndex.textContent = index + 1;
-
-        const cellX = document.createElement("td");
-        cellX.textContent = Math.round(point.x);
-
-        const cellY = document.createElement("td");
-        cellY.textContent = Math.round(point.y);
-
-        row.appendChild(cellIndex);
-        row.appendChild(cellX);
-        row.appendChild(cellY);
+        row.innerHTML = `<td>${index + 1}</td><td>${Math.round(point.x)}</td><td>${Math.round(point.y)}</td>`;
         tableBody.appendChild(row);
     });
+    drawVoronoi();
 }
 
-// Check if mouse is near a point
-function getPointAtPosition(x, y) {
-    return points.find(point => {
-        const dx = point.x - x;
-        const dy = point.y - y;
-        return Math.sqrt(dx * dx + dy * dy) <= pointRadius;
-    });
-}
-
-// Start dragging if clicking on a point
+// Add point on click
 canvas.addEventListener("mousedown", (event) => {
     const rect = canvas.getBoundingClientRect();
     const x = event.clientX - rect.left;
@@ -62,8 +67,10 @@ canvas.addEventListener("mousedown", (event) => {
 
     if (point) {
         draggingPoint = point;
+        console.log(`Started dragging point at (${point.x}, ${point.y}).`);
     } else {
         points.push({ x, y });
+        console.log(`Added new point at (${x}, ${y}).`);
         drawPoints();
         updateTable();
         draggingPoint = getPointAtPosition(x, y);
@@ -76,24 +83,26 @@ canvas.addEventListener("mousemove", (event) => {
         const rect = canvas.getBoundingClientRect();
         draggingPoint.x = event.clientX - rect.left;
         draggingPoint.y = event.clientY - rect.top;
+        //console.log(`Dragging point to (${draggingPoint.x}, ${draggingPoint.y}).`);
         drawPoints();
         updateTable();
     }
 });
 
-// Stop dragging on mouse up
+// Stop dragging
 canvas.addEventListener("mouseup", () => {
     draggingPoint = null;
 });
 
-// Function to clear all points
+// Clear all points
 function clearAllPoints() {
-    points.length = 0;  // Clear the points array
-    drawPoints();       // Clear the canvas
-    updateTable();      // Clear the table
+    points.length = 0;
+    console.log("Cleared all points.");
+    drawVoronoi();
+    updateTable();
 }
 
-// Function to add 5 random points
+// Add random point
 function addRandomPoint() {
     while (true) {
         const x = Math.random() * canvas.width;
@@ -101,14 +110,30 @@ function addRandomPoint() {
         const point = getPointAtPosition(x, y);
         if (!point) {
             points.push({ x, y });
+            console.log(`Added random point at (${x}, ${y}).`);
             break;
         }
     }
-
-    drawPoints();
+    drawVoronoi();
     updateTable();
 }
 
-// Add event listener to the "Clear All Points" button
-document.getElementById("clear-button").addEventListener("click", clearAllPoints);
-document.getElementById("add-random-button").addEventListener("click", addRandomPoint);
+// Check if mouse is near a point
+function getPointAtPosition(x, y) {
+    return points.find(point => {
+        const dx = point.x - x;
+        const dy = point.y - y;
+        return Math.sqrt(dx * dx + dy * dy) <= pointRadius;
+    });
+}
+
+// Event listeners for buttons
+document.getElementById("clear-button").addEventListener("click", () => {
+    console.log("Clear button clicked.");
+    clearAllPoints();
+});
+
+document.getElementById("add-random-button").addEventListener("click", () => {
+    console.log("Add random point button clicked.");
+    addRandomPoint();
+});
