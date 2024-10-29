@@ -16,7 +16,7 @@
         <div class="table-container">
             <h2>Point Coordinates</h2>
             <button id="clear-button">Clear All Points</button>
-            <button id="add-random-button">Add random point</button>
+            <button id="add-random-button">Add Random Point</button>
             <table id="points-table">
                 <thead>
                     <tr>
@@ -29,6 +29,28 @@
             </table>
         </div>
     </div>
+
+    <div class="controls">
+        <h2>Algorithm Controls</h2>
+        <button id="visualize-fortune-button">Visualize Fortune's Algorithm</button>
+        <button id="next-button" disabled>Next</button>
+        <button id="fast-forward-button" disabled>Fast Forward</button>
+        <button id="rewind-button" disabled>Rewind</button>
+
+        <h3>Options</h3>
+        <label>
+            <input type="checkbox" id="show-beachline" /> Show Beach Line
+        </label>
+        <label>
+            <input type="checkbox" id="show-circle-events" /> Show Circle Events
+        </label>
+    </div>
+
+    <div class="description-panel">
+        <h3>Algorithm Step Description</h3>
+        <p id="step-description">Click "Visualize Fortune's Algorithm" to start.</p>
+    </div>
+
     <script src="https://d3js.org/d3.v5.min.js"></script>
     <script src="script.js"></script>
 </body>
