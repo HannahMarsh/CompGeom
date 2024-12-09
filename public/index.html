@@ -8,10 +8,38 @@
 </head>
 <body>
     <h1>Voronoi Diagram Visualizer</h1>
-
+    <div class="page">
     <div class="canvas-table-container">
-        <div class="canvas-container">
-            <canvas id="main-canvas"></canvas>
+        
+        <div class="canvas-table">
+            <h2>Canvas</h2>
+            <h3>Click anywhere in the canvas to add a point.</h3>
+            <div class="canvas-container">
+                <canvas id="main-canvas"></canvas>
+            </div>
+        </div>
+        
+        <div class="algorithm">
+            <div class="controls">
+                <h2>Algorithm Controls</h2>
+                <button id="visualize-fortune-button">Play</button>
+                <button id="pause-button">Pause</button>
+                <button id="next-button" disabled>Next</button>
+                <button id="rewind-button" disabled>Back</button>
+                <button id="fast-forward-button" disabled>Fast Forward</button>
+        
+                <h3 style="text-align: left;">Options</h3>
+                <label>
+                    <input type="checkbox" id="show-beachline" /> Show Beach Line
+                </label>
+                <label>
+                    <input type="checkbox" id="show-circle-events" /> Show Circle Events
+                </label>
+            </div>
+            <div class="description-panel">
+                <h3>Algorithm Step Description</h3>
+                <p id="step-description">Click "Visualize Fortune's Algorithm" to start.</p>
+            </div>
         </div>
         <div class="table-container">
             <h2>Point Coordinates</h2>
@@ -29,27 +57,11 @@
             </table>
         </div>
     </div>
-
-    <div class="controls">
-        <h2>Algorithm Controls</h2>
-        <button id="visualize-fortune-button">Visualize Fortune's Algorithm</button>
-        <button id="next-button" disabled>Next</button>
-        <button id="fast-forward-button" disabled>Fast Forward</button>
-        <button id="rewind-button" disabled>Rewind</button>
-
-        <h3>Options</h3>
-        <label>
-            <input type="checkbox" id="show-beachline" /> Show Beach Line
-        </label>
-        <label>
-            <input type="checkbox" id="show-circle-events" /> Show Circle Events
-        </label>
     </div>
 
-    <div class="description-panel">
-        <h3>Algorithm Step Description</h3>
-        <p id="step-description">Click "Visualize Fortune's Algorithm" to start.</p>
-    </div>
+    
+
+    
 
     <script src="https://d3js.org/d3.v5.min.js"></script>
     <script src="script.js"></script>
