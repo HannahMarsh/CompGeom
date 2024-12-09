@@ -51,6 +51,8 @@ function addPoint(x, y) {
 
 // Function to compute and draw Voronoi diagram
 function drawVoronoi() {
+
+    console.log(`Canvas dimensions: ${canvas.width} x ${canvas.height}`)
     //console.log("Drawing Voronoi diagram...");
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     drawPoints();
@@ -60,6 +62,13 @@ function drawVoronoi() {
         // Use the custom Voronoi class
         const voronoi = new Voronoi(points.map(p => new Point(p.x, p.y)), canvas.width, canvas.height);
         voronoi.update();
+
+        voronoi.edges.forEach(edge => {
+            if (edge.start && edge.end) {
+                console.log(`Edge from (${edge.start.x}, ${edge.start.y}) to (${edge.end.x}, ${edge.end.y})`);
+            }
+        });
+        
 
         //Draw edges
         voronoi.edges.forEach(edge => {
