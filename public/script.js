@@ -18,17 +18,27 @@ function drawVoronoi() {
             .extent([[0, 0], [canvas.width, canvas.height]])
             .polygons(points.map(p => [p.x, p.y]));
 
+        // Generate colors for each point
+        const colors = points.map(() => `hsl(${Math.random() * 360}, 70%, 80%)`);
+
         voronoi.forEach((cell, index) => {
-            ctx.beginPath();
             if (cell) {
+                ctx.beginPath();
                 ctx.moveTo(cell[0][0], cell[0][1]);
                 cell.forEach(([x, y]) => ctx.lineTo(x, y));
                 ctx.closePath();
-                ctx.strokeStyle = 'gray';
+
+                // Fill with a unique color
+                ctx.fillStyle = colors[index];
+                ctx.fill();
+
+                // Stroke the outline in gray
+                ctx.strokeStyle = 'black';
                 ctx.stroke();
             }
-           // console.log(`Voronoi cell for point ${index + 1} drawn.`);
         });
+        // Draw the points on top of the cells
+        drawPoints();
     }
 }
 
