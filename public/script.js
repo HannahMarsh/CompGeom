@@ -1,11 +1,94 @@
 const canvas = document.getElementById("main-canvas");
 const ctx = canvas.getContext("2d");
 const points = [];
+const colors = [];
 const pointRadius = 5;
 let draggingPoint = null;
+//const initialColors = [5,27,40,75,100,147,173,206,242,286,336];
+//const intitialIndexes = [10,6,3,8,4,7,2,9,1,5,0];
+const initialColors = [286,173,65,242,100,195,40,330,135,5];
 
-canvas.width = canvas.clientWidth;
-canvas.height = canvas.clientHeight;
+
+// Set initial canvas dimensions
+function setCanvasDimensions() {
+    canvas.width = canvas.clientWidth;
+    canvas.height = canvas.clientHeight;
+}
+
+// Scale points when canvas resizes
+function scalePoints(oldWidth, oldHeight, newWidth, newHeight) {
+    points.forEach(point => {
+        point.x = (point.x / oldWidth) * newWidth;
+        point.y = (point.y / oldHeight) * newHeight;
+    });
+}
+
+// Function to handle resizing
+function handleResize() {
+    const oldWidth = canvas.width;
+    const oldHeight = canvas.height;
+
+    setCanvasDimensions();
+
+    const newWidth = canvas.width;
+    const newHeight = canvas.height;
+
+    scalePoints(oldWidth, oldHeight, newWidth, newHeight);
+
+    drawVoronoi();
+    updateTable();
+}
+
+// Call this on load and attach to window resize event
+setCanvasDimensions();
+window.addEventListener("resize", handleResize);
+
+function getColor(index) {
+    if (index < initialColors.length) {
+        return `hsl(${initialColors[index]}, 70%, 85%)`;
+    } else {
+        return `hsl(${calculateFurthestHue()}, 100%, 85%)`; //`hsl(${Math.random() * 360}, 70%, 85%)`;
+    }
+}
+
+// Helper function to calculate the hue furthest from the existing ones
+function calculateFurthestHue() {
+    const existingHues = colors.map(hsl => {
+        const match = hsl.match(/hsl\((\d+),/); // Regex to capture the hue value
+        return match ? parseInt(match[1], 10) : null; // Parse hue as an integer
+    });
+    const step = 1; // Fine granularity for searching hues
+    let maxDistance = -1;
+    let bestHue = 0;
+
+    for (let hue = 0; hue < 360; hue += step) {
+        const minDistance = Math.min(
+            ...existingHues.map(existingHue => angularDistance(hue, existingHue))
+        );
+        if (minDistance > maxDistance) {
+            maxDistance = minDistance;
+            bestHue = hue;
+        }
+    }
+
+    return bestHue;
+}
+
+// Helper function to calculate angular distance between two hues
+function angularDistance(h1, h2) {
+    const diff = Math.abs(h1 - h2);
+    return Math.min(diff, 360 - diff); // Account for circular wraparound
+}
+
+function addPoint(x, y) {
+    const point = getPointAtPosition(x, y);
+    if (!point) {
+        points.push({ x, y });
+        const color = getColor(points.length - 1); //`hsl(${Math.random() * 360}, 70%, 85%)`;
+        colors.push(color);
+        console.log(`Added point at (${x}, ${y}) with color ${color}.`);
+    }
+}
 
 // Function to compute and draw Voronoi diagram
 function drawVoronoi() {
@@ -19,7 +102,7 @@ function drawVoronoi() {
             .polygons(points.map(p => [p.x, p.y]));
 
         // Generate colors for each point
-        const colors = points.map(() => `hsl(${Math.random() * 360}, 70%, 80%)`);
+        // const colors = points.map(() => `hsl(${Math.random() * 360}, 70%, 80%)`);
 
         voronoi.forEach((cell, index) => {
             if (cell) {
@@ -38,6 +121,13 @@ function drawVoronoi() {
             }
         });
         // Draw the points on top of the cells
+        drawPoints();
+    } else if (points.length == 1) {
+        // Set the fill style to the HSL color
+        ctx.fillStyle = colors[0];
+
+        // Fill the entire canvas
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
         drawPoints();
     }
 }
@@ -79,8 +169,7 @@ canvas.addEventListener("mousedown", (event) => {
         draggingPoint = point;
         console.log(`Started dragging point at (${point.x}, ${point.y}).`);
     } else {
-        points.push({ x, y });
-        console.log(`Added new point at (${x}, ${y}).`);
+        addPoint(x, y)
         drawPoints();
         updateTable();
         draggingPoint = getPointAtPosition(x, y);
@@ -119,14 +208,15 @@ function addRandomPoint() {
         const y = Math.random() * canvas.height;
         const point = getPointAtPosition(x, y);
         if (!point) {
-            points.push({ x, y });
-            console.log(`Added random point at (${x}, ${y}).`);
+            addPoint(x, y);
             break;
         }
     }
     drawVoronoi();
     updateTable();
 }
+
+
 
 // Check if mouse is near a point
 function getPointAtPosition(x, y) {
