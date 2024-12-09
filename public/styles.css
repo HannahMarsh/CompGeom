@@ -1,15 +1,17 @@
 body {
-    font-family: Arial, sans-serif;
+    font-family: "PT Sans", "sans-serif";
     display: flex;
     flex-direction: column;
     align-items: center;
     margin: 0;
     padding: 20px;
-    background-color: #f3e2ff;
+    background-color: #f7ebff;
 }
 
 h1 {
     margin-bottom: 20px;
+    font-weight: 300;
+    letter-spacing: -1px;
 }
 
 .canvas-table-container {
@@ -21,6 +23,7 @@ h1 {
 .canvas-container {
     width: 50vw;
     height: 50vh;
+    background-color: #ffffff;
 }
 
 canvas {

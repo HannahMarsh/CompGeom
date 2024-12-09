@@ -1,5 +1,8 @@
 # CompGeom - Point-Line Duality Visualization
 
+A web-based application for visualizing Voronoi diagrams, with functionality for adding and manipulating points dynamically on a canvas. 
+
+
 ## Getting Started
 
 ### Installation
