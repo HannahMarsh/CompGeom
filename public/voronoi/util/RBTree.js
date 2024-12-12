@@ -263,6 +263,7 @@ class RBTree {
     }
 
     getFirst(node) {
+        if (!node) {return null;}
         while (node.rbLeft) {
             node = node.rbLeft;
         }

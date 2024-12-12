@@ -1220,6 +1220,148 @@ Voronoi.prototype.compute = function(sites, bbox) {
     return diagram;
 };
 
+
+
+Voronoi.prototype.computeStepByStep = function(sites, bbox, step) {
+    // init internal state
+    this.reset();
+
+    // Initialize site event queue
+    var siteEvents = sites.slice(0);
+    siteEvents.sort(function(a,b){
+        var r = b.y - a.y;
+        if (r) {return r;}
+        return b.x - a.x;
+    });
+
+    // process queue
+    var site = siteEvents.pop(),
+        siteid = 0,
+        xsitex, // to avoid duplicate sites
+        xsitey,
+        cells = this.cells,
+        circle;
+
+    let i;
+
+    // main loop
+    for (i = 0; i < step; i++) {
+        // we need to figure whether we handle a site or circle event
+        // for this we find out if there is a site event and it is
+        // 'earlier' than the circle event
+        circle = this.firstCircleEvent;
+
+        // add beach section
+        if (site && (!circle || site.y < circle.y || (site.y === circle.y && site.x < circle.x))) {
+            // only if site is not a duplicate
+            if (site.x !== xsitex || site.y !== xsitey) {
+                // first create cell for new site
+                cells[siteid] = this.createCell(site);
+                site.voronoiId = siteid++;
+                // then create a beachsection for that site
+                this.addBeachsection(site);
+                // remember last site coords to detect duplicate
+                xsitey = site.y;
+                xsitex = site.x;
+            }
+            site = siteEvents.pop();
+        }
+
+        // remove beach section
+        else if (circle) {
+            this.removeBeachsection(circle.arc);
+        }
+
+        // all done, quit
+        else {
+            break;
+        }
+    }
+
+    // wrapping-up:
+    //   connect dangling edges to bounding box
+    //   cut edges as per bounding box
+    //   discard edges completely outside bounding box
+    //   discard edges which are point-like
+    this.clipEdges(bbox);
+
+    //   add missing edges in order to close opened cells
+    this.closeCells(bbox);
+
+    // to measure execution time
+    var stopTime = new Date();
+
+    // prepare return values
+    var diagram = new this.Diagram();
+    diagram.cells = this.cells;
+    diagram.edges = this.edges;
+    diagram.vertices = this.vertices;
+    diagram.i = i;
+    diagram.beachline = this.beachline?.root?.site;
+    if (diagram.beachline) {
+        diagram.beachlineArcs = this.getBeachlineArcs(diagram.beachline.y);
+    }
+    diagram.circleEvents = this.getActiveCircleEvents();
+    diagram.processedSites = sites.slice(0, siteid);
+    diagram.unprocessedSites = siteEvents.slice();
+    diagram.sweepLine = site ? site.y : circle ? circle.y : null;
+
+
+
+
+
+
+    // clean up
+    //this.reset();
+
+    return diagram;
+};
+
+Voronoi.prototype.getBeachlineArcs = function(directrix) {
+    const beachlineArcs = [];
+    let arc = this.beachline?.getFirst(this.beachline?.root);
+    while (arc) {
+        beachlineArcs.push({
+            site: arc.site,
+            leftBreakpoint: this.leftBreakPoint(arc, directrix),
+            rightBreakpoint: this.rightBreakPoint(arc, directrix),
+        });
+        arc = arc.rbNext;
+    }
+    return beachlineArcs;
+};
+
+Voronoi.prototype.getActiveCircleEvents = function() {
+    const circleEvents = [];
+    let event = this.circleEvents?.getFirst(this.circleEvents?.root);
+    while (event) {
+        circleEvents.push({
+            x: event.x,
+            y: event.ycenter,
+            radius: Math.sqrt((event.x - event.arc.site.x) ** 2 + (event.ycenter - event.arc.site.y) ** 2),
+            arc: event.arc,
+        });
+        event = event.rbNext;
+    }
+    return circleEvents;
+};
+
+
+
+Voronoi.prototype.getBeachline = function() {
+    const beachline = [];
+    let section = this.beachline.getFirst(this.beachline.root);
+    while (section) {
+        beachline.push(section);
+        section = section.rbNext;
+    }
+    return beachline;
+};
+
+
+
+
+
 /******************************************************************************/
 
 if ( typeof module !== 'undefined' ) {
