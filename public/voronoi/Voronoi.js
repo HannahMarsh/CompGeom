@@ -1299,7 +1299,7 @@ Voronoi.prototype.computeStepByStep = function(sites, bbox, step) {
     diagram.i = i;
     diagram.beachline = this.beachline?.root?.site;
     if (diagram.beachline) {
-        diagram.beachlineArcs = this.getBeachlineArcs(diagram.beachline.x);
+        diagram.beachlineArcs = this.getBeachlineArcs(diagram.beachline);
     }
     diagram.circleEvents = this.getActiveCircleEvents();
     diagram.processedSites = sites.slice(0, siteid);
@@ -1317,14 +1317,14 @@ Voronoi.prototype.computeStepByStep = function(sites, bbox, step) {
     return diagram;
 };
 
-Voronoi.prototype.getBeachlineArcs = function(directrix) {
+Voronoi.prototype.getBeachlineArcs = function(beachline) {
     const beachlineArcs = [];
     let arc = this.beachline?.getFirst(this.beachline?.root);
     while (arc) {
         beachlineArcs.push({
             site: arc.site,
-            leftBreakpoint: this.leftBreakPoint(arc, directrix),
-            rightBreakpoint: this.rightBreakPoint(arc, directrix),
+            leftBreakpoint: this.leftBreakPoint(arc, beachline.y),
+            rightBreakpoint: this.rightBreakPoint(arc, beachline.y),
         });
         arc = arc.rbNext;
     }
@@ -1350,7 +1350,7 @@ Voronoi.prototype.getActiveCircleEvents = function() {
 
 Voronoi.prototype.getBeachline = function() {
     const beachline = [];
-    let section = this.beachline.getFirst(this.beachline.root);
+    let section = this.beachline?.getFirst(this.beachline?.root);
     while (section) {
         beachline.push(section);
         section = section.rbNext;

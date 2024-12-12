@@ -7,6 +7,8 @@ let draggingPoint = null;
 let voronoi = new Voronoi();
 let steps = [];
 let isDone = false;
+let showBeachline = false;
+let showCircles = false;
 
 
 // Set initial canvas dimensions
@@ -255,6 +257,22 @@ document.getElementById("back-button").addEventListener("click", () => {
 
 });
 
+document.getElementById("show-beachline").addEventListener("change", (event) => {
+    console.log("Show beachline.");
+    showBeachline = event.target.checked;
+    if (step > 0) {
+        redraw();
+    }
+});
+
+document.getElementById("show-circle-events").addEventListener("change", (event) => {
+    console.log("Show circles.");
+    showCircles = event.target.checked;
+    if (step > 0) {
+        redraw();
+    }
+});
+
 
 function initializeAlgorithm() {
     const bbox = { xl: 0, xr: canvas.width, yt: 0, yb: canvas.height };
@@ -273,6 +291,12 @@ function nextStep() {
     if (result.i < step) {
         isDone = true;
     }
+}
+
+function redraw() {
+    const bbox = { xl: 0, xr: canvas.width, yt: 0, yb: canvas.height };
+    let result = voronoi.computeStepByStep(points, bbox, step);
+    drawResult(result);
 }
 
 function backStep() {
@@ -334,12 +358,12 @@ function drawResult(result) {
     if (result.sweepLine) {
         drawHorizontalLine(result.sweepLine, "red");
     }
-    if (result.beachlineArcs && result.sweepLine) {
+    if (result.beachlineArcs && result.sweepLine && showBeachline) {
         drawArcs(result.beachlineArcs, result.sweepLine, "blue")
     }
-    if (result.circleEvents) {
+    if (result.circleEvents && showCircles) {
         result.circleEvents.forEach(circleEvent => {
-            drawCircle(result.circleEvent);
+            drawCircle(circleEvent.x, circleEvent.y, circleEvent.radius);
         });
     }
     if (result.beachline) {
@@ -406,17 +430,13 @@ function drawHorizontalLine(y, color) {
     ctx.stroke();
 }
 
-function drawCircle(circleEvent) {
-    // Extract properties
-    if (circleEvent) {
-        const x = circleEvent.x; // Circle center X-coordinate
-        const y = circleEvent.y; // Circle center Y-coordinate
-        const r = circleEvent.radius; // Circle radius
+function drawCircle(x, y, r) {
+
 
         // Set drawing properties
         ctx.beginPath(); // Begin a new path
         ctx.arc(x, y, r, 0, 2 * Math.PI); // Draw the circle
-        ctx.strokeStyle = "blue"; // Set the circle color
+        ctx.strokeStyle = "purple"; // Set the circle color
         ctx.lineWidth = 2; // Set the line width
         ctx.stroke(); // Draw the stroke of the circle
 
@@ -425,7 +445,7 @@ function drawCircle(circleEvent) {
         ctx.arc(x, y, 2, 0, 2 * Math.PI); // Draw a small dot at the center
         ctx.fillStyle = "red"; // Center point color
         ctx.fill(); // Fill the center point
-    }
+
 }
 
 
