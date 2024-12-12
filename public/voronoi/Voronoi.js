@@ -190,9 +190,11 @@ class Voronoi {
                     });
     
                     // Assign both start and end points
-                    //e.start = intersections[0];
-                    e.end = intersections[1];
-                    console.log(`Edge completed from (${e.start.x}, ${e.start.y}) to (${e.end.x}, ${e.end.y})`);
+                    if (this.point_list.length == 2) {
+                        e.start = intersections[0];
+                        e.end = intersections[1];
+                        console.log(`Edge completed from (${e.start.x}, ${e.start.y}) to (${e.end.x}, ${e.end.y})`);
+                    }
                 }
             }
             r = r.right;
