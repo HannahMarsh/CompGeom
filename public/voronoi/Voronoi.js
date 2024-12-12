@@ -1297,7 +1297,7 @@ Voronoi.prototype.computeStepByStep = function(sites, bbox, step) {
     diagram.edges = this.edges;
     diagram.vertices = this.vertices;
     diagram.i = i;
-    diagram.beachline = this.beachline?.root?.site;
+    diagram.beachline = site; // this.getBeachline()?.map(arc => arc?.site).sort((a, b) => b.y - a.y).at(0);
     if (diagram.beachline) {
         diagram.beachlineArcs = this.getBeachlineArcs(diagram.beachline);
     }
