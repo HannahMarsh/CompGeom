@@ -21,7 +21,7 @@ function scalePoints(oldWidth, oldHeight, newWidth, newHeight) {
 
 // Function to handle resizing
 function handleResize() {
-    if (canvas.width != canvas.clientWidth || canvas.height != canvas.clientHeight) {
+    if (canvas.width !== canvas.clientWidth || canvas.height !== canvas.clientHeight) {
         const oldWidth = canvas.width;
         const oldHeight = canvas.height;
 
