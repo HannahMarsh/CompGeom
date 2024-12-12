@@ -61,7 +61,11 @@ function drawVoronoi() {
     if (points.length > 1) {
 
         const voronoi = new Voronoi();
+
         result = voronoi.compute(points, {xl: 0, xr: canvas.width, yt: 0, yb: canvas.height});
+
+
+        console.log(result); // Ensure it logs the Voronoi object
 
         // Use the custom Voronoi class
         //const voronoi = new Voronoi(points.map(p => new Point(p.x, p.y)), canvas.width, canvas.height);

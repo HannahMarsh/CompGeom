@@ -62,6 +62,7 @@ Voronoi.Halfedge object:
 
 // ---------------------------------------------------------------------------
 
+
 function Voronoi() {
     this.vertices = null;
     this.edges = null;
@@ -70,22 +71,15 @@ function Voronoi() {
 
 // ---------------------------------------------------------------------------
 
-Voronoi.prototype.reset = function() {
-    if (!this.beachline) {
-        this.beachline = new this.RBTree();
-    }
-    // Move leftover beachsections to the beachsection junkyard.
-    if (this.beachline.root) {
-        let beachSection = this.beachline.getFirst(this.beachline.root);
-        while (beachSection) {
-            beachSection = beachSection.rbNext;
-        }
-    }
-    this.beachline.root = null;
-    if (!this.circleEvents) {
-        this.circleEvents = new this.RBTree();
-    }
-    this.circleEvents.root = this.firstCircleEvent = null;
+// Reset the Voronoi state
+Voronoi.prototype.reset = function () {
+    this.beachline = new RBTree((a, b) => a.x - b.x); // Compare by x-coordinates for beachline
+    this.circleEvents = new RBTree((a, b) => {
+        // Compare by y, then x to prioritize earlier events
+        if (a.y === b.y) return a.x - b.x;
+        return a.y - b.y;
+    });
+    this.firstCircleEvent = null;
     this.vertices = [];
     this.edges = [];
     this.cells = [];
@@ -633,6 +627,12 @@ Voronoi.prototype.detachBeachsection = function(beachsection) {
     this.beachline.rbRemoveNode(beachsection); // remove from RB-tree
 };
 
+// Helper to remove a node from the tree
+// Voronoi.prototype.removeBeachsection = function (beachsection) {
+//     this.detachCircleEvent(beachsection);
+//     this.beachline.remove(beachsection);
+// };
+
 Voronoi.prototype.removeBeachsection = function(beachsection) {
     var circle = beachsection.circleEvent,
         x = circle.x,
@@ -709,13 +709,20 @@ Voronoi.prototype.removeBeachsection = function(beachsection) {
     this.attachCircleEvent(rArc);
 };
 
+
+
+// Helper to add a node to the tree
+// Voronoi.prototype.addBeachsection = function (beachsection) {
+//     this.beachline.insert(beachsection);
+// };
+
 Voronoi.prototype.addBeachsection = function(site) {
     var x = site.x,
         directrix = site.y;
 
     // find the left and right beach sections which will surround the newly
     // created beach section.
-    // This loop is one of the most often executed,
+    // rhill 2011-06-01: This loop is one of the most often executed,
     // hence we expand in-place the comparison-against-epsilon calls.
     var lArc, rArc,
         dxl, dxr,
@@ -828,7 +835,7 @@ Voronoi.prototype.addBeachsection = function(site) {
     // and left to right, which guarantees that there will always be a beach section
     // on the left -- except of course when there are no beach section at all on
     // the beach line, which case was handled above.
-    // No point testing in non-debug version
+    // rhill 2011-06-02: No point testing in non-debug version
     //if (!lArc && rArc) {
     //    throw "Voronoi.addBeachsection(): What is this I don't even";
     //    }
@@ -898,100 +905,24 @@ Voronoi.prototype.CircleEvent = function() {
     this.site = null;
 };
 
-Voronoi.prototype.attachCircleEvent = function(arc) {
-    var lArc = arc.rbPrevious,
-        rArc = arc.rbNext;
-    if (!lArc || !rArc) {return;} // does that ever happen?
-    var lSite = lArc.site,
-        cSite = arc.site,
-        rSite = rArc.site;
+// Attach a circle event
+Voronoi.prototype.attachCircleEvent = function (arc) {
+    const circleEvent = {
+        arc,
+        x: 0, // Replace with actual calculations
+        y: 0, // Replace with actual calculations
+    };
 
-    // If site of left beachsection is same as site of
-    // right beachsection, there can't be convergence
-    if (lSite===rSite) {return;}
-
-    // Find the circumscribed circle for the three sites associated
-    // with the beachsection triplet.
-    // It is more efficient to calculate in-place
-    // rather than getting the resulting circumscribed circle from an
-    // object returned by calling Voronoi.circumcircle()
-    // http://mathforum.org/library/drmath/view/55002.html
-    // Except that I bring the origin at cSite to simplify calculations.
-    // The bottom-most part of the circumcircle is our Fortune 'circle
-    // event', and its center is a vertex potentially part of the final
-    // Voronoi diagram.
-    var bx = cSite.x,
-        by = cSite.y,
-        ax = lSite.x-bx,
-        ay = lSite.y-by,
-        cx = rSite.x-bx,
-        cy = rSite.y-by;
-
-    // If points l->c->r are clockwise, then center beach section does not
-    // collapse, hence it can't end up as a vertex (we reuse 'd' here, which
-    // sign is reverse of the orientation, hence we reverse the test.
-    // http://en.wikipedia.org/wiki/Curve_orientation#Orientation_of_a_simple_polygon
-    // Nasty finite precision error which caused circumcircle() to
-    // return infinites: 1e-12 seems to fix the problem.
-    var d = 2*(ax*cy-ay*cx);
-    if (d >= -2e-12){return;}
-
-    var ha = ax*ax+ay*ay,
-        hc = cx*cx+cy*cy,
-        x = (cy*ha-ay*hc)/d,
-        y = (ax*hc-cx*ha)/d,
-        ycenter = y+by;
-
-    // Important: ybottom should always be under or at sweep, so no need
-    // to waste CPU cycles by checking
-
-    // recycle circle event object if possible
-    var circleEvent = new this.CircleEvent();
-
-    circleEvent.arc = arc;
-    circleEvent.site = cSite;
-    circleEvent.x = x+bx;
-    circleEvent.y = ycenter+this.sqrt(x*x+y*y); // y bottom
-    circleEvent.ycenter = ycenter;
-    arc.circleEvent = circleEvent;
-
-    // find insertion point in RB-tree: circle events are ordered from
-    // smallest to largest
-    var predecessor = null,
-        node = this.circleEvents.root;
-    while (node) {
-        if (circleEvent.y < node.y || (circleEvent.y === node.y && circleEvent.x <= node.x)) {
-            if (node.rbLeft) {
-                node = node.rbLeft;
-            }
-            else {
-                predecessor = node.rbPrevious;
-                break;
-            }
-        }
-        else {
-            if (node.rbRight) {
-                node = node.rbRight;
-            }
-            else {
-                predecessor = node;
-                break;
-            }
-        }
-    }
-    this.circleEvents.rbInsertSuccessor(predecessor, circleEvent);
-    if (!predecessor) {
+    this.circleEvents.insert(circleEvent);
+    if (!this.firstCircleEvent || circleEvent.y < this.firstCircleEvent.y) {
         this.firstCircleEvent = circleEvent;
     }
 };
 
-Voronoi.prototype.detachCircleEvent = function(arc) {
-    var circleEvent = arc.circleEvent;
-    if (circleEvent) {
-        if (!circleEvent.rbPrevious) {
-            this.firstCircleEvent = circleEvent.rbNext;
-        }
-        this.circleEvents.rbRemoveNode(circleEvent); // remove from RB-tree
+// Detach a circle event
+Voronoi.prototype.detachCircleEvent = function (arc) {
+    if (arc.circleEvent) {
+        this.circleEvents.remove(arc.circleEvent);
         arc.circleEvent = null;
     }
 };
@@ -1409,6 +1340,40 @@ Voronoi.prototype.dumpBeachline = function(y) {
 
 // ---------------------------------------------------------------------------
 // Top-level Fortune loop
+//   Voronoi sites are kept client-side now, to allow
+//   user to freely modify content. At compute time,
+//   *references* to sites are copied locally.
+
+// Voronoi.prototype.compute = function(sites, bbox) {
+//
+//     // init internal state
+//     this.reset();
+//
+//     // Initialize site event queue
+//     const siteEvents = sites.slice().sort((a, b) => {
+//         if (a.y === b.y) return a.x - b.x;
+//         return a.y - b.y;
+//     });
+//
+//     // process queue
+//
+//     let site = siteEvents.pop();
+//
+//     while (site) {
+//         this.addBeachsection(site);
+//         site = siteEvents.pop();
+//     }
+//
+//     this.clipEdges(bbox);
+//     this.closeCells(bbox);
+//
+//     return {
+//         vertices: this.vertices,
+//         edges: this.edges,
+//         cells: this.cells,
+//     };
+// };
+
 //   Voronoi sites are kept client-side now, to allow
 //   user to freely modify content. At compute time,
 //   *references* to sites are copied locally.
