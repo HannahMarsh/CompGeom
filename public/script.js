@@ -2,6 +2,7 @@ const canvas = document.getElementById("main-canvas");
 const ctx = canvas.getContext("2d");
 const points = [];
 const pointRadius = 5;
+let step = 0;
 let draggingPoint = null;
 
 
@@ -111,25 +112,27 @@ function updateTable() {
 
 // Add point on click
 canvas.addEventListener("mousedown", (event) => {
-    const rect = canvas.getBoundingClientRect();
-    const x = event.clientX - rect.left;
-    const y = event.clientY - rect.top;
-    const point = getPointAtPosition(x, y);
+    if (step === 0) {
+        const rect = canvas.getBoundingClientRect();
+        const x = event.clientX - rect.left;
+        const y = event.clientY - rect.top;
+        const point = getPointAtPosition(x, y);
 
-    if (point) {
-        draggingPoint = point;
-        console.log(`Started dragging point at (${point.x}, ${point.y}).`);
-    } else {
-        addPoint(x, y)
-        drawPoints();
-        updateTable();
-        draggingPoint = getPointAtPosition(x, y);
+        if (point) {
+            draggingPoint = point;
+            console.log(`Started dragging point at (${point.x}, ${point.y}).`);
+        } else {
+            addPoint(x, y)
+            drawPoints();
+            updateTable();
+            draggingPoint = getPointAtPosition(x, y);
+        }
     }
 });
 
 // Update point position while dragging
 canvas.addEventListener("mousemove", (event) => {
-    if (draggingPoint) {
+    if (step === 0 && draggingPoint) {
         const rect = canvas.getBoundingClientRect();
         draggingPoint.x = event.clientX - rect.left;
         draggingPoint.y = event.clientY - rect.top;
@@ -141,7 +144,13 @@ canvas.addEventListener("mousemove", (event) => {
 
 // Stop dragging
 canvas.addEventListener("mouseup", () => {
-    draggingPoint = null;
+    if (step === 0) {
+        draggingPoint = null;
+    }
+    if (points.length === 1) {
+        enableButton("visualize-fortune-button");
+        document.getElementById("add-points").hidden = true;
+    }
 });
 
 // Clear all points
@@ -178,13 +187,58 @@ function getPointAtPosition(x, y) {
     });
 }
 
+function disableButton(buttonId) {
+    document.getElementById(buttonId).disabled = true;
+}
+
+function enableButton(buttonId) {
+    document.getElementById(buttonId).disabled = false;
+}
+
+
 // Event listeners for buttons
 document.getElementById("clear-button").addEventListener("click", () => {
     console.log("Clear button clicked.");
     clearAllPoints();
+    disableButton("visualize-fortune-button");
+    disableButton("next-button");
+    disableButton("back-button");
+    disableButton("fast-forward-button");
+    document.getElementById("add-points").hidden = false;
 });
 
 document.getElementById("add-random-button").addEventListener("click", () => {
     console.log("Add random point button clicked.");
     addRandomPoint();
+    if (points.length === 1) {
+        enableButton("visualize-fortune-button");
+        document.getElementById("add-points").hidden = true;
+    }
+});
+
+document.getElementById("visualize-fortune-button").addEventListener("click", () => {
+    console.log("Algorithm started");
+    disableButton("clear-button");
+    disableButton("add-random-button");
+    disableButton("back-button");
+    enableButton("next-button");
+    enableButton("fast-forward-button");
+    enableButton("pause-button");
+    step = 1;
+
+});
+
+document.getElementById("next-button").addEventListener("click", () => {
+    console.log("Next.");
+    step = step + 1;
+    enableButton("back-button");
+});
+
+document.getElementById("back-button").addEventListener("click", () => {
+    console.log("Back.");
+    step = step - 1;
+    if (step === 1) {
+        disableButton("back-button");
+    }
+
 });
