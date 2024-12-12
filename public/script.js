@@ -207,6 +207,12 @@ function startOver() {
     }
 }
 
+document.addEventListener("DOMContentLoaded", () => {
+    for (let i = 0; i < 10; i++) {
+        addRandomPoint();
+    }
+});
+
 
 // Event listeners for buttons
 document.getElementById("clear-button").addEventListener("click", () => {
@@ -331,6 +337,11 @@ function drawResult(result) {
     if (result.beachlineArcs && result.sweepLine) {
         drawArcs(result.beachlineArcs, result.sweepLine, "blue")
     }
+    if (result.circleEvents) {
+        result.circleEvents.forEach(circleEvent => {
+            drawCircle(result.circleEvent);
+        });
+    }
     if (result.beachline) {
         drawPoint({ x: result.beachline.x, y: result.beachline.y }, "red");
         // if (result.firstCircleEvent?.arc) {
@@ -359,7 +370,7 @@ function drawArcs(beachlineArcs, sweepLine, color) {
             return;
         }
 
-        const st = (right - left) / 100; // Adjust step size for smoothness
+        const st = (right - left) / 1000; // Adjust step size for smoothness
 
         if (st > 0) {
             for (let x = left; x <= right; x += st) {
@@ -394,6 +405,29 @@ function drawHorizontalLine(y, color) {
     ctx.strokeStyle = color;
     ctx.stroke();
 }
+
+function drawCircle(circleEvent) {
+    // Extract properties
+    if (circleEvent) {
+        const x = circleEvent.x; // Circle center X-coordinate
+        const y = circleEvent.y; // Circle center Y-coordinate
+        const r = circleEvent.radius; // Circle radius
+
+        // Set drawing properties
+        ctx.beginPath(); // Begin a new path
+        ctx.arc(x, y, r, 0, 2 * Math.PI); // Draw the circle
+        ctx.strokeStyle = "blue"; // Set the circle color
+        ctx.lineWidth = 2; // Set the line width
+        ctx.stroke(); // Draw the stroke of the circle
+
+        // Optionally label or indicate the center point of the circle
+        ctx.beginPath();
+        ctx.arc(x, y, 2, 0, 2 * Math.PI); // Draw a small dot at the center
+        ctx.fillStyle = "red"; // Center point color
+        ctx.fill(); // Fill the center point
+    }
+}
+
 
 
 
