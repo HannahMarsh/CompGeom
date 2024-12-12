@@ -57,33 +57,28 @@ function drawVoronoi() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     drawPoints();
 
+    let result;
     if (points.length > 1) {
 
+        const voronoi = new Voronoi();
+        result = voronoi.compute(points, {xl: 0, xr: canvas.width, yt: 0, yb: canvas.height});
+
         // Use the custom Voronoi class
-        const voronoi = new Voronoi(points.map(p => new Point(p.x, p.y)), canvas.width, canvas.height);
-        voronoi.update();
+        //const voronoi = new Voronoi(points.map(p => new Point(p.x, p.y)), canvas.width, canvas.height);
+        // voronoi.update();
 
-        voronoi.edges.forEach(edge => {
-            if (edge.start && edge.end) {
-                console.log(`Edge from (${edge.start.x}, ${edge.start.y}) to (${edge.end.x}, ${edge.end.y})`);
-            }
-        });
-        
-
-        //Draw edges
-        voronoi.edges.forEach(edge => {
-            if (edge.start && edge.end) {
-                ctx.beginPath();
-                ctx.moveTo(edge.start.x, edge.start.y);
-                ctx.lineTo(edge.end.x, edge.end.y);
-                ctx.strokeStyle = 'black'; // Edge color
-                ctx.stroke();
-            }
+        result.edges.forEach(edge => {
+            console.log(`Edge from (${edge.vb.x}, ${edge.vb.y}) to (${edge.va.x}, ${edge.va.y})`);
+            ctx.beginPath();
+            ctx.moveTo(edge.vb.x, edge.vb.y);
+            ctx.lineTo(edge.va.x, edge.va.y);
+            ctx.strokeStyle = 'black'; // Edge color
+            ctx.stroke();
         });
 
         drawPoints(); // Redraw points on top
 
-    } else if (points.length == 1) {
+    } else if (points.length === 1) {
         drawPoints();
     }
 }
