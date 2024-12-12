@@ -66,12 +66,6 @@ function Voronoi() {
     this.vertices = null;
     this.edges = null;
     this.cells = null;
-    this.toRecycle = null; // Storage for data that can be recycled in subsequent computations
-    this.beachsectionJunkyard = []; // Pool of reusable beach sections for memory optimization
-    this.circleEventJunkyard = []; // Pool of reusable circle events for memory optimization
-    this.vertexJunkyard = []; // Pool of reusable vertex objects for memory optimization
-    this.edgeJunkyard = []; // Pool of reusable edge objects for memory optimization
-    this.cellJunkyard = []; // Pool of reusable cell objects for memory optimization
 }
 
 // ---------------------------------------------------------------------------
@@ -84,7 +78,6 @@ Voronoi.prototype.reset = function() {
     if (this.beachline.root) {
         let beachSection = this.beachline.getFirst(this.beachline.root);
         while (beachSection) {
-            this.beachsectionJunkyard.push(beachSection); // mark for reuse
             beachSection = beachSection.rbNext;
         }
     }
@@ -401,10 +394,6 @@ Voronoi.prototype.Cell.prototype.init = function(site) {
 };
 
 Voronoi.prototype.createCell = function(site) {
-    var cell = this.cellJunkyard.pop();
-    if ( cell ) {
-        return cell.init(site);
-    }
     return new this.Cell(site);
 };
 
@@ -488,14 +477,7 @@ Voronoi.prototype.Halfedge.prototype.getEndpoint = function() {
 // this create and add a vertex to the internal collection
 
 Voronoi.prototype.createVertex = function(x, y) {
-    var v = this.vertexJunkyard.pop();
-    if ( !v ) {
-        v = new this.Vertex(x, y);
-    }
-    else {
-        v.x = x;
-        v.y = y;
-    }
+    const v = new this.Vertex(x, y);
     this.vertices.push(v);
     return v;
 };
@@ -505,15 +487,7 @@ Voronoi.prototype.createVertex = function(x, y) {
 // of halfedges.
 
 Voronoi.prototype.createEdge = function(lSite, rSite, va, vb) {
-    var edge = this.edgeJunkyard.pop();
-    if ( !edge ) {
-        edge = new this.Edge(lSite, rSite);
-    }
-    else {
-        edge.lSite = lSite;
-        edge.rSite = rSite;
-        edge.va = edge.vb = null;
-    }
+    const edge = new this.Edge(lSite, rSite);
 
     this.edges.push(edge);
     if (va) {
@@ -528,14 +502,7 @@ Voronoi.prototype.createEdge = function(lSite, rSite, va, vb) {
 };
 
 Voronoi.prototype.createBorderEdge = function(lSite, va, vb) {
-    var edge = this.edgeJunkyard.pop();
-    if ( !edge ) {
-        edge = new this.Edge(lSite, null);
-    }
-    else {
-        edge.lSite = lSite;
-        edge.rSite = null;
-    }
+    var edge = new this.Edge(lSite, null);
     edge.va = va;
     edge.vb = vb;
     this.edges.push(edge);
@@ -578,10 +545,7 @@ Voronoi.prototype.Beachsection = function() {
 // performance gain.
 
 Voronoi.prototype.createBeachsection = function(site) {
-    var beachsection = this.beachsectionJunkyard.pop();
-    if (!beachsection) {
-        beachsection = new this.Beachsection();
-    }
+    var beachsection = new this.Beachsection();
     beachsection.site = site;
     return beachsection;
 };
@@ -667,7 +631,6 @@ Voronoi.prototype.rightBreakPoint = function(arc, directrix) {
 Voronoi.prototype.detachBeachsection = function(beachsection) {
     this.detachCircleEvent(beachsection); // detach potentially attached circle event
     this.beachline.rbRemoveNode(beachsection); // remove from RB-tree
-    this.beachsectionJunkyard.push(beachsection); // mark for reuse
 };
 
 Voronoi.prototype.removeBeachsection = function(beachsection) {
@@ -983,10 +946,8 @@ Voronoi.prototype.attachCircleEvent = function(arc) {
     // to waste CPU cycles by checking
 
     // recycle circle event object if possible
-    var circleEvent = this.circleEventJunkyard.pop();
-    if (!circleEvent) {
-        circleEvent = new this.CircleEvent();
-    }
+    var circleEvent = new this.CircleEvent();
+
     circleEvent.arc = arc;
     circleEvent.site = cSite;
     circleEvent.x = x+bx;
@@ -1031,7 +992,6 @@ Voronoi.prototype.detachCircleEvent = function(arc) {
             this.firstCircleEvent = circleEvent.rbNext;
         }
         this.circleEvents.rbRemoveNode(circleEvent); // remove from RB-tree
-        this.circleEventJunkyard.push(circleEvent);
         arc.circleEvent = null;
     }
 };
@@ -1459,15 +1419,6 @@ Voronoi.prototype.compute = function(sites, bbox) {
 
     // init internal state
     this.reset();
-
-    // any diagram data available for recycling?
-    // I do that here so that this is included in execution time
-    if ( this.toRecycle ) {
-        this.vertexJunkyard = this.vertexJunkyard.concat(this.toRecycle.vertices);
-        this.edgeJunkyard = this.edgeJunkyard.concat(this.toRecycle.edges);
-        this.cellJunkyard = this.cellJunkyard.concat(this.toRecycle.cells);
-        this.toRecycle = null;
-    }
 
     // Initialize site event queue
     var siteEvents = sites.slice(0);
