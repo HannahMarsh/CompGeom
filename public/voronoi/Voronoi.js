@@ -74,7 +74,6 @@ Voronoi.prototype.reset = function() {
     if (!this.beachline) {
         this.beachline = new this.RBTree();
     }
-    // Move leftover beachsections to the beachsection junkyard.
     if (this.beachline.root) {
         let beachSection = this.beachline.getFirst(this.beachline.root);
         while (beachSection) {
