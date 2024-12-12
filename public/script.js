@@ -7,9 +7,10 @@ let draggingPoint = null;
 let voronoi = new Voronoi();
 let steps = [];
 let isDone = false;
-let showBeachline = false;
+let showBeachline = true;
 let showCircles = false;
-
+let sweepline = 0;
+let finalEdges = [];
 
 // Set initial canvas dimensions
 function setCanvasDimensions() {
@@ -73,6 +74,8 @@ function drawVoronoi() {
         //const voronoi = new Voronoi(points.map(p => new Point(p.x, p.y)), canvas.width, canvas.height);
         // voronoi.update();
 
+        finalEdges = result.edges;
+
         result.edges.forEach(edge => {
             console.log(`Edge from (${edge.vb.x}, ${edge.vb.y}) to (${edge.va.x}, ${edge.va.y})`);
             drawEdge(edge);
@@ -109,6 +112,16 @@ function updateTable() {
         tableBody.appendChild(row);
     });
     drawVoronoi();
+    if (points.length > 1) {
+        enableButton("visualize-fortune-button");
+        document.getElementById("add-points").hidden = true;
+    } else {
+        disableButton("visualize-fortune-button");
+        document.getElementById("add-points").hidden = false;
+    }
+    if (step > 1) {
+        redraw();
+    }
 }
 
 // Add point on click
@@ -127,7 +140,7 @@ canvas.addEventListener("mousedown", (event) => {
         updateTable();
         draggingPoint = getPointAtPosition(x, y);
     }
-    startOver();
+    //startOver();
 });
 
 // Update point position while dragging
@@ -139,14 +152,14 @@ canvas.addEventListener("mousemove", (event) => {
         //console.log(`Dragging point to (${draggingPoint.x}, ${draggingPoint.y}).`);
         drawPoints();
         updateTable();
-        startOver();
+        //startOver();
     }
 });
 
 // Stop dragging
 canvas.addEventListener("mouseup", () => {
     draggingPoint = null;
-    startOver();
+    //startOver();
 });
 
 // Clear all points
@@ -171,7 +184,6 @@ function addRandomPoint() {
     }
     drawVoronoi();
     updateTable();
-    startOver();
 }
 
 
@@ -195,11 +207,13 @@ function enableButton(buttonId) {
 
 function startOver() {
     step = 0;
+    started = false;
     document.getElementById("i-num").innerText = step;
     disableButton("next-button");
     disableButton("back-button");
     disableButton("fast-forward-button");
     disableButton("pause-button");
+    document.getElementById("visualize-fortune-button").innerText = "Start";
     if (points.length > 1) {
         enableButton("visualize-fortune-button");
         document.getElementById("add-points").hidden = true;
@@ -227,15 +241,71 @@ document.getElementById("add-random-button").addEventListener("click", () => {
     addRandomPoint();
 });
 
+let started = false;
+
 document.getElementById("visualize-fortune-button").addEventListener("click", () => {
-    console.log("Algorithm started");
-    disableButton("clear-button");
-    disableButton("add-random-button");
-    disableButton("back-button");
-    enableButton("next-button");
-    enableButton("fast-forward-button");
-    enableButton("pause-button");
-    initializeAlgorithm();
+    if (started === false) {
+        started = true;
+        console.log("Algorithm started");
+        disableButton("back-button");
+        enableButton("next-button");
+        enableButton("fast-forward-button");
+        enableButton("pause-button");
+        document.getElementById("visualize-fortune-button").innerText = "Exit";
+        initializeAlgorithm();
+    } else {
+        started = false;
+        console.log("Algorithm stopped");
+        document.getElementById("visualize-fortune-button").innerText = "Start";
+        startOver();
+    }
+});
+
+let isPaused = true;
+
+document.getElementById("pause-button").addEventListener("click", () => {
+    if (isPaused) {
+        isPaused = false;
+        document.getElementById("pause-button").innerText = "Pause";
+        console.log("Unpaused.");
+// Start clicking "Next" every second when unpaused
+        intervalId = setInterval(() => {
+            if (!isPaused && !isDone && !document.getElementById("next-button").disabled) {
+                document.getElementById("next-button").click();
+                console.log("Clicked Next.");
+            } else {
+                // Stop the interval when paused or when isDone is true
+                clearInterval(intervalId);
+                intervalId = null;
+                console.log("Stopped auto-click due to pause or completion.");
+                if (isDone) {
+                    isPaused = true;
+                    startOver();
+                    document.getElementById("pause-button").innerText = "Auto-play";
+                }
+            }
+        }, 1000);
+    } else {
+        isPaused = true;
+        document.getElementById("pause-button").innerText = "Resume";
+        console.log("Paused.");
+
+        // Stop the interval
+        if (intervalId !== null) {
+            clearInterval(intervalId);
+            intervalId = null;
+        }
+    }
+});
+
+document.getElementById("fast-forward-button").addEventListener("click", () => {
+    console.log("Fast forward.");
+    for (let i = 0; i < 3; i++) {
+        if (!isDone && !document.getElementById("next-button").disabled) {
+            document.getElementById("next-button").click();
+            console.log("Clicked Next.");
+        }
+    }
 });
 
 document.getElementById("next-button").addEventListener("click", () => {
@@ -244,6 +314,7 @@ document.getElementById("next-button").addEventListener("click", () => {
     nextStep();
     if (isDone) {
         disableButton("next-button");
+        startOver();
     }
 });
 
@@ -276,7 +347,7 @@ document.getElementById("show-circle-events").addEventListener("change", (event)
 
 function initializeAlgorithm() {
     const bbox = { xl: 0, xr: canvas.width, yt: 0, yb: canvas.height };
-    step = 1;
+    step = 0;
     document.getElementById("i-num").innerText = step;
     let result = voronoi.computeStepByStep(points, bbox, step);
     drawResult(result);
@@ -284,13 +355,21 @@ function initializeAlgorithm() {
 
 function nextStep() {
     const bbox = { xl: 0, xr: canvas.width, yt: 0, yb: canvas.height };
-    step++;
-    document.getElementById("i-num").innerText = step;
-    let result = voronoi.computeStepByStep(points, bbox, step);
-    drawResult(result);
-    if (result.i < step) {
-        isDone = true;
-    }
+
+    // for (;;) {
+    //     let oldsweep = sweepline;
+        step++;
+        document.getElementById("i-num").innerText = step;
+        let result = voronoi.computeStepByStep(points, bbox, step);
+        drawResult(result);
+        // if (oldsweep !== result.sweepLine) {
+        //     break;
+        // }
+        if (result.i < step) {
+            isDone = true;
+           // break;
+        }
+    //}
 }
 
 function redraw() {
@@ -331,12 +410,29 @@ function drawParabola(focus, directrix) {
 }
 
 function drawEdge(edge) {
+    let isFinalEdge = !!finalEdges.find(e => {
+        return e.va.x === edge.va.x && e.va.y === edge.va.y && e.vb.x === edge.vb.x && e.vb.y === edge.vb.y;
+    });
+
     ctx.beginPath();
     ctx.moveTo(edge.vb.x, edge.vb.y);
     ctx.lineTo(edge.va.x, edge.va.y);
-    ctx.strokeStyle = 'black'; // Edge color
+    ctx.strokeStyle = isFinalEdge ? "black" : "grey" // Edge color
+
+    ctx.lineWidth = isFinalEdge ? 2 : 1; // Set the line width
     ctx.stroke();
 }
+
+// function drawEdge(edge) {
+//     // Generate a random color for each edge
+//     const randomColor = `hsl(${Math.random() * 360}, 100%, 50%)`; // Random hue
+//     ctx.beginPath();
+//     ctx.moveTo(edge.vb.x, edge.vb.y);
+//     ctx.lineTo(edge.va.x, edge.va.y);
+//     ctx.strokeStyle = randomColor; // Assign the random color
+//     ctx.stroke();
+// }
+
 
 function drawResult(result) {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -345,33 +441,21 @@ function drawResult(result) {
         drawEdge(edge);
     });
     drawPoints(); // Redraw points on top
-    if (result.processedSites) {
-        result.processedSites.forEach(site => {
-            drawPoint(site, "green");
-        });
-    }
-    if (result.unprocessedSites) {
-        result.unprocessedSites.forEach(site => {
-            drawPoint(site, "white");
-        });
-    }
     if (result.sweepLine) {
-        drawHorizontalLine(result.sweepLine, "red");
-    }
-    if (result.beachlineArcs && result.sweepLine && showBeachline) {
-        drawArcs(result.beachlineArcs, result.sweepLine, "blue")
-    }
-    if (result.circleEvents && showCircles) {
-        result.circleEvents.forEach(circleEvent => {
-            drawCircle(circleEvent.x, circleEvent.y, circleEvent.radius);
+        points.forEach((point, index) => {
+            drawPoint(point, point.y > result.sweepLine ? "white" : point.y === result.sweepLine ? "red" : "blue")
         });
-    }
-    if (result.beachline) {
-        drawPoint({ x: result.beachline.x, y: result.beachline.y }, "red");
-        // if (result.firstCircleEvent?.arc) {
-        //     //drawArc(result.firstCircleEvent.arc, result.beachline.y, voronoi.bbox);
-        //     drawParabola(result.firstCircleEvent.arc.site, result.beachline.y);
-        // }
+        drawHorizontalLine(result.sweepLine, "red");
+        sweepline = result.sweepLine;
+
+        if (result.beachlineArcs && showBeachline) {
+            drawArcs(result.beachlineArcs, result.sweepLine, "blue")
+        }
+        if (result.circleEvents && showCircles) {
+            result.circleEvents.forEach(circleEvent => {
+                drawCircle(circleEvent.x, circleEvent.y, circleEvent.radius);
+            });
+        }
     }
 
 
@@ -437,7 +521,7 @@ function drawCircle(x, y, r) {
         ctx.beginPath(); // Begin a new path
         ctx.arc(x, y, r, 0, 2 * Math.PI); // Draw the circle
         ctx.strokeStyle = "purple"; // Set the circle color
-        ctx.lineWidth = 2; // Set the line width
+        ctx.lineWidth = 1; // Set the line width
         ctx.stroke(); // Draw the stroke of the circle
 
         // Optionally label or indicate the center point of the circle

@@ -113,6 +113,10 @@ button {
     transition: background-color 0.3s;
 }
 
+#visualize-fortune-button:enabled {
+    background-color: #a05fcb;
+}
+
 button:hover {
     background-color: #a05fcb;
 }

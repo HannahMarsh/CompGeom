@@ -1300,16 +1300,9 @@ Voronoi.prototype.computeStepByStep = function(sites, bbox, step) {
     diagram.beachline = site; // this.getBeachline()?.map(arc => arc?.site).sort((a, b) => b.y - a.y).at(0);
     if (diagram.beachline) {
         diagram.beachlineArcs = this.getBeachlineArcs(diagram.beachline);
+        diagram.circleEvents = this.getActiveCircleEvents();
+        diagram.sweepLine = site.y;
     }
-    diagram.circleEvents = this.getActiveCircleEvents();
-    diagram.processedSites = sites.slice(0, siteid);
-    diagram.unprocessedSites = siteEvents.slice();
-    diagram.sweepLine = site ? site.y : circle ? circle.y : null;
-
-
-
-
-
 
     // clean up
     //this.reset();
