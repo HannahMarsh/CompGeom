@@ -66,12 +66,12 @@ function Voronoi() {
     this.vertices = null;
     this.edges = null;
     this.cells = null;
-    this.toRecycle = null;
-    this.beachsectionJunkyard = [];
-    this.circleEventJunkyard = [];
-    this.vertexJunkyard = [];
-    this.edgeJunkyard = [];
-    this.cellJunkyard = [];
+    this.toRecycle = null; // Storage for data that can be recycled in subsequent computations
+    this.beachsectionJunkyard = []; // Pool of reusable beach sections for memory optimization
+    this.circleEventJunkyard = []; // Pool of reusable circle events for memory optimization
+    this.vertexJunkyard = []; // Pool of reusable vertex objects for memory optimization
+    this.edgeJunkyard = []; // Pool of reusable edge objects for memory optimization
+    this.cellJunkyard = []; // Pool of reusable cell objects for memory optimization
 }
 
 // ---------------------------------------------------------------------------
@@ -82,10 +82,10 @@ Voronoi.prototype.reset = function() {
     }
     // Move leftover beachsections to the beachsection junkyard.
     if (this.beachline.root) {
-        var beachsection = this.beachline.getFirst(this.beachline.root);
-        while (beachsection) {
-            this.beachsectionJunkyard.push(beachsection); // mark for reuse
-            beachsection = beachsection.rbNext;
+        let beachSection = this.beachline.getFirst(this.beachline.root);
+        while (beachSection) {
+            this.beachsectionJunkyard.push(beachSection); // mark for reuse
+            beachSection = beachSection.rbNext;
         }
     }
     this.beachline.root = null;
@@ -100,24 +100,15 @@ Voronoi.prototype.reset = function() {
 
 Voronoi.prototype.sqrt = Math.sqrt;
 Voronoi.prototype.abs = Math.abs;
-Voronoi.prototype.ε = Voronoi.ε = 1e-9;
-Voronoi.prototype.invε = Voronoi.invε = 1.0 / Voronoi.ε;
-Voronoi.prototype.equalWithEpsilon = function(a,b){return this.abs(a-b)<1e-9;};
-Voronoi.prototype.greaterThanWithEpsilon = function(a,b){return a-b>1e-9;};
-Voronoi.prototype.greaterThanOrEqualWithEpsilon = function(a,b){return b-a<1e-9;};
-Voronoi.prototype.lessThanWithEpsilon = function(a,b){return b-a>1e-9;};
-Voronoi.prototype.lessThanOrEqualWithEpsilon = function(a,b){return a-b<1e-9;};
-
-// ---------------------------------------------------------------------------
-// Red-Black tree code (based on C version of "rbtree" by Franck Bui-Huu
-// https://github.com/fbuihuu/libtree/blob/master/rb.c
-
+Voronoi.prototype.equalWithEpsilon = function(a, b){return this.abs(a-b)<1e-9;};
+Voronoi.prototype.greaterThanWithEpsilon = function(a, b){return a-b>1e-9;};
+Voronoi.prototype.lessThanWithEpsilon = function(a, b){return b-a>1e-9;};
 Voronoi.prototype.RBTree = function() {
     this.root = null;
 };
 
 Voronoi.prototype.RBTree.prototype.rbInsertSuccessor = function(node, successor) {
-    var parent;
+    let parent;
     if (node) {
         // >>> rhill 2011-05-27: Performance: cache previous/next nodes
         successor.rbPrevious = node;
@@ -138,7 +129,7 @@ Voronoi.prototype.RBTree.prototype.rbInsertSuccessor = function(node, successor)
         }
         parent = node;
     }
-        // rhill 2011-06-07: if node is null, successor must be inserted
+        // if node is null, successor must be inserted
     // to the left-most part of the tree
     else if (this.root) {
         node = this.getFirst(this.root);
@@ -163,7 +154,7 @@ Voronoi.prototype.RBTree.prototype.rbInsertSuccessor = function(node, successor)
     // Fixup the modified tree by recoloring nodes and performing
     // rotations (2 at most) hence the red-black tree properties are
     // preserved.
-    var grandpa, uncle;
+    let grandpa, uncle;
     node = successor;
     while (parent && parent.rbRed) {
         grandpa = parent.rbParent;
@@ -209,7 +200,6 @@ Voronoi.prototype.RBTree.prototype.rbInsertSuccessor = function(node, successor)
 };
 
 Voronoi.prototype.RBTree.prototype.rbRemoveNode = function(node) {
-    // >>> rhill 2011-05-27: Performance: cache previous/next nodes
     if (node.rbNext) {
         node.rbNext.rbPrevious = node.rbPrevious;
     }
@@ -218,7 +208,7 @@ Voronoi.prototype.RBTree.prototype.rbRemoveNode = function(node) {
     }
     node.rbNext = node.rbPrevious = null;
     // <<<
-    var parent = node.rbParent,
+    let parent = node.rbParent,
         left = node.rbLeft,
         right = node.rbRight,
         next;
@@ -243,7 +233,7 @@ Voronoi.prototype.RBTree.prototype.rbRemoveNode = function(node) {
         this.root = next;
     }
     // enforce red-black rules
-    var isRed;
+    let isRed;
     if (left && right) {
         isRed = next.rbRed;
         next.rbRed = node.rbRed;
@@ -389,14 +379,6 @@ Voronoi.prototype.RBTree.prototype.getFirst = function(node) {
     }
     return node;
 };
-
-Voronoi.prototype.RBTree.prototype.getLast = function(node) {
-    while (node.rbRight) {
-        node = node.rbRight;
-    }
-    return node;
-};
-
 // ---------------------------------------------------------------------------
 // Diagram methods
 
@@ -410,13 +392,11 @@ Voronoi.prototype.Diagram = function(site) {
 Voronoi.prototype.Cell = function(site) {
     this.site = site;
     this.halfedges = [];
-    this.closeMe = false;
 };
 
 Voronoi.prototype.Cell.prototype.init = function(site) {
     this.site = site;
     this.halfedges = [];
-    this.closeMe = false;
     return this;
 };
 
@@ -433,7 +413,7 @@ Voronoi.prototype.Cell.prototype.prepareHalfedges = function() {
         iHalfedge = halfedges.length,
         edge;
     // get rid of unused halfedges
-    // rhill 2011-05-27: Keep it simple, no point here in trying
+    // Keep it simple, no point here in trying
     // to be fancy: dangling edges are a typically a minority.
     while (iHalfedge--) {
         edge = halfedges[iHalfedge].edge;
@@ -442,7 +422,7 @@ Voronoi.prototype.Cell.prototype.prepareHalfedges = function() {
         }
     }
 
-    // rhill 2011-05-26: I tried to use a binary search at insertion
+    // I tried to use a binary search at insertion
     // time to keep the array sorted on-the-fly (in Cell.addHalfedge()).
     // There was no real benefits in doing so, performance on
     // Firefox 3.6 was improved marginally, while performance on
@@ -451,88 +431,6 @@ Voronoi.prototype.Cell.prototype.prepareHalfedges = function() {
     return halfedges.length;
 };
 
-// Return a list of the neighbor Ids
-Voronoi.prototype.Cell.prototype.getNeighborIds = function() {
-    var neighbors = [],
-        iHalfedge = this.halfedges.length,
-        edge;
-    while (iHalfedge--){
-        edge = this.halfedges[iHalfedge].edge;
-        if (edge.lSite !== null && edge.lSite.voronoiId != this.site.voronoiId) {
-            neighbors.push(edge.lSite.voronoiId);
-        }
-        else if (edge.rSite !== null && edge.rSite.voronoiId != this.site.voronoiId){
-            neighbors.push(edge.rSite.voronoiId);
-        }
-    }
-    return neighbors;
-};
-
-// Compute bounding box
-//
-Voronoi.prototype.Cell.prototype.getBbox = function() {
-    var halfedges = this.halfedges,
-        iHalfedge = halfedges.length,
-        xmin = Infinity,
-        ymin = Infinity,
-        xmax = -Infinity,
-        ymax = -Infinity,
-        v, vx, vy;
-    while (iHalfedge--) {
-        v = halfedges[iHalfedge].getStartpoint();
-        vx = v.x;
-        vy = v.y;
-        if (vx < xmin) {xmin = vx;}
-        if (vy < ymin) {ymin = vy;}
-        if (vx > xmax) {xmax = vx;}
-        if (vy > ymax) {ymax = vy;}
-        // we dont need to take into account end point,
-        // since each end point matches a start point
-    }
-    return {
-        x: xmin,
-        y: ymin,
-        width: xmax-xmin,
-        height: ymax-ymin
-    };
-};
-
-// Return whether a point is inside, on, or outside the cell:
-//   -1: point is outside the perimeter of the cell
-//    0: point is on the perimeter of the cell
-//    1: point is inside the perimeter of the cell
-//
-Voronoi.prototype.Cell.prototype.pointIntersection = function(x, y) {
-    // Check if point in polygon. Since all polygons of a Voronoi
-    // diagram are convex, then:
-    // http://paulbourke.net/geometry/polygonmesh/
-    // Solution 3 (2D):
-    //   "If the polygon is convex then one can consider the polygon
-    //   "as a 'path' from the first vertex. A point is on the interior
-    //   "of this polygons if it is always on the same side of all the
-    //   "line segments making up the path. ...
-    //   "(y - y0) (x1 - x0) - (x - x0) (y1 - y0)
-    //   "if it is less than 0 then P is to the right of the line segment,
-    //   "if greater than 0 it is to the left, if equal to 0 then it lies
-    //   "on the line segment"
-    var halfedges = this.halfedges,
-        iHalfedge = halfedges.length,
-        halfedge,
-        p0, p1, r;
-    while (iHalfedge--) {
-        halfedge = halfedges[iHalfedge];
-        p0 = halfedge.getStartpoint();
-        p1 = halfedge.getEndpoint();
-        r = (y-p0.y)*(p1.x-p0.x)-(x-p0.x)*(p1.y-p0.y);
-        if (!r) {
-            return 0;
-        }
-        if (r > 0) {
-            return -1;
-        }
-    }
-    return 1;
-};
 
 // ---------------------------------------------------------------------------
 // Edge methods
@@ -565,7 +463,7 @@ Voronoi.prototype.Halfedge = function(edge, lSite, rSite) {
     else {
         var va = edge.va,
             vb = edge.vb;
-        // rhill 2011-05-31: used to call getStartpoint()/getEndpoint(),
+        // used to call getStartpoint()/getEndpoint(),
         // but for performance purpose, these are expanded in place here.
         this.angle = edge.lSite === lSite ?
             Math.atan2(vb.x-va.x, va.y-vb.y) :
@@ -665,12 +563,12 @@ Voronoi.prototype.setEdgeEndpoint = function(edge, lSite, rSite, vertex) {
 // ---------------------------------------------------------------------------
 // Beachline methods
 
-// rhill 2011-06-07: For some reasons, performance suffers significantly
+// For some reasons, performance suffers significantly
 // when instanciating a literal object instead of an empty ctor
 Voronoi.prototype.Beachsection = function() {
 };
 
-// rhill 2011-06-02: A lot of Beachsection instanciations
+// A lot of Beachsection instanciations
 // occur during the computation of the Voronoi diagram,
 // somewhere between the number of sites and twice the
 // number of sites, while the number of Beachsections on the
@@ -854,7 +752,7 @@ Voronoi.prototype.addBeachsection = function(site) {
 
     // find the left and right beach sections which will surround the newly
     // created beach section.
-    // rhill 2011-06-01: This loop is one of the most often executed,
+    // This loop is one of the most often executed,
     // hence we expand in-place the comparison-against-epsilon calls.
     var lArc, rArc,
         dxl, dxr,
@@ -967,7 +865,7 @@ Voronoi.prototype.addBeachsection = function(site) {
     // and left to right, which guarantees that there will always be a beach section
     // on the left -- except of course when there are no beach section at all on
     // the beach line, which case was handled above.
-    // rhill 2011-06-02: No point testing in non-debug version
+    // No point testing in non-debug version
     //if (!lArc && rArc) {
     //    throw "Voronoi.addBeachsection(): What is this I don't even";
     //    }
@@ -1017,17 +915,16 @@ Voronoi.prototype.addBeachsection = function(site) {
         // and if so create circle events, to handle the point of collapse.
         this.attachCircleEvent(lArc);
         this.attachCircleEvent(rArc);
-        return;
     }
 };
 
 // ---------------------------------------------------------------------------
 // Circle event methods
 
-// rhill 2011-06-07: For some reasons, performance suffers significantly
+// For some reasons, performance suffers significantly
 // when instanciating a literal object instead of an empty ctor
 Voronoi.prototype.CircleEvent = function() {
-    // rhill 2013-10-12: it helps to state exactly what we are at ctor time.
+    // it helps to state exactly what we are at ctor time.
     this.arc = null;
     this.rbLeft = null;
     this.rbNext = null;
@@ -1036,7 +933,6 @@ Voronoi.prototype.CircleEvent = function() {
     this.rbRed = false;
     this.rbRight = null;
     this.site = null;
-    this.x = this.y = this.ycenter = 0;
 };
 
 Voronoi.prototype.attachCircleEvent = function(arc) {
@@ -1053,7 +949,7 @@ Voronoi.prototype.attachCircleEvent = function(arc) {
 
     // Find the circumscribed circle for the three sites associated
     // with the beachsection triplet.
-    // rhill 2011-05-26: It is more efficient to calculate in-place
+    // It is more efficient to calculate in-place
     // rather than getting the resulting circumscribed circle from an
     // object returned by calling Voronoi.circumcircle()
     // http://mathforum.org/library/drmath/view/55002.html
@@ -1072,7 +968,7 @@ Voronoi.prototype.attachCircleEvent = function(arc) {
     // collapse, hence it can't end up as a vertex (we reuse 'd' here, which
     // sign is reverse of the orientation, hence we reverse the test.
     // http://en.wikipedia.org/wiki/Curve_orientation#Orientation_of_a_simple_polygon
-    // rhill 2011-05-21: Nasty finite precision error which caused circumcircle() to
+    // Nasty finite precision error which caused circumcircle() to
     // return infinites: 1e-12 seems to fix the problem.
     var d = 2*(ax*cy-ay*cx);
     if (d >= -2e-12){return;}
@@ -1189,15 +1085,11 @@ Voronoi.prototype.connectEdge = function(edge, bbox) {
     // rightward: left.y < right.y
     // leftward: left.y > right.y
     // vertical: left.y == right.y
-
+    //
     // depending on the direction, find the best side of the
     // bounding box to use to determine a reasonable start point
-
-    // rhill 2013-12-02:
     // While at it, since we have the values which define the line,
     // clip the end of va if it is outside the bbox.
-    // https://github.com/gorhill/Javascript-Voronoi/issues/15
-    // TODO: Do all the clipping here rather than rely on Liang-Barsky
     // which does not do well sometimes due to loss of arithmetic
     // precision. The code here doesn't degrade if one of the vertex is
     // at a huge distance.
@@ -1347,7 +1239,7 @@ Voronoi.prototype.clipEdge = function(edge, bbox) {
     // if we reach this point, Voronoi edge is within bbox
 
     // if t0 > 0, va needs to change
-    // rhill 2011-06-03: we need to create a new vertex rather
+    // we need to create a new vertex rather
     // than modifying the existing one, since the existing
     // one is likely shared with at least another edge
     if (t0 > 0) {
@@ -1355,7 +1247,7 @@ Voronoi.prototype.clipEdge = function(edge, bbox) {
     }
 
     // if t1 < 1, vb needs to change
-    // rhill 2011-06-03: we need to create a new vertex rather
+    // we need to create a new vertex rather
     // than modifying the existing one, since the existing
     // one is likely shared with at least another edge
     if (t1 < 1) {
@@ -1442,9 +1334,7 @@ Voronoi.prototype.closeCells = function(bbox) {
             // halfedge(s) up to vz
             if (abs_fn(va.x-vz.x)>=1e-9 || abs_fn(va.y-vz.y)>=1e-9) {
 
-                // rhill 2013-12-02:
                 // "Holes" in the halfedges are not necessarily always adjacent.
-                // https://github.com/gorhill/Javascript-Voronoi/issues/16
 
                 // find entry point:
                 switch (true) {
@@ -1541,7 +1431,7 @@ Voronoi.prototype.closeCells = function(bbox) {
 
 // ---------------------------------------------------------------------------
 // Debugging helper
-/*
+
 Voronoi.prototype.dumpBeachline = function(y) {
     console.log('Voronoi.dumpBeachline(%f) > Beachsections, from left to right:', y);
     if ( !this.beachline ) {
@@ -1552,54 +1442,13 @@ Voronoi.prototype.dumpBeachline = function(y) {
         while ( bs ) {
             console.log('  site %d: xl: %f, xr: %f', bs.site.voronoiId, this.leftBreakPoint(bs, y), this.rightBreakPoint(bs, y));
             bs = bs.rbNext;
-            }
-        }
-    };
-*/
-
-// ---------------------------------------------------------------------------
-// Helper: Quantize sites
-
-// rhill 2013-10-12:
-// This is to solve https://github.com/gorhill/Javascript-Voronoi/issues/15
-// Since not all users will end up using the kind of coord values which would
-// cause the issue to arise, I chose to let the user decide whether or not
-// he should sanitize his coord values through this helper. This way, for
-// those users who uses coord values which are known to be fine, no overhead is
-// added.
-
-Voronoi.prototype.quantizeSites = function(sites) {
-    var ε = this.ε,
-        n = sites.length,
-        site;
-    while ( n-- ) {
-        site = sites[n];
-        site.x = Math.floor(site.x / ε) * ε;
-        site.y = Math.floor(site.y / ε) * ε;
-    }
-};
-
-// ---------------------------------------------------------------------------
-// Helper: Recycle diagram: all vertex, edge and cell objects are
-// "surrendered" to the Voronoi object for reuse.
-// TODO: rhill-voronoi-core v2: more performance to be gained
-// when I change the semantic of what is returned.
-
-Voronoi.prototype.recycle = function(diagram) {
-    if ( diagram ) {
-        if ( diagram instanceof this.Diagram ) {
-            this.toRecycle = diagram;
-        }
-        else {
-            throw 'Voronoi.recycleDiagram() > Need a Diagram object.';
         }
     }
 };
+
 
 // ---------------------------------------------------------------------------
 // Top-level Fortune loop
-
-// rhill 2011-05-19:
 //   Voronoi sites are kept client-side now, to allow
 //   user to freely modify content. At compute time,
 //   *references* to sites are copied locally.
