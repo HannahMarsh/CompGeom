@@ -209,6 +209,8 @@ function startOver() {
     step = 0;
     started = false;
     sweepline = 0;
+    prevLines = [];
+    prevEdges = [];
     document.getElementById("i-num").innerText = step;
     disableButton("next-button");
     disableButton("back-button");
@@ -454,53 +456,57 @@ async function drawResult(result, smooth) {
     });
 
     if (result.sweepLine) {
-        let s = sweepline < result.sweepLine ? 1 : -1; // Determine direction
-        let arcs = result.beachlineArcs;
-        let edges = prevEdges.pop();
-        if (s < 0) {
-            arcs = prevLines.pop()
-            edges = result.edges;
-        } else if (s > 0) {
-            prevLines.push(arcs)
-            if (edges) {
-                prevEdges.push(edges);
-            }
-            prevEdges.push(result.edges);
-        }
-        if (smooth) {
-            // Smoothly move the sweep line
-
-            if (sweepline !== result.sweepLine) {
-
-                let sleepTime = 500 / Math.abs(result.sweepLine - sweepline)
-
-                for (let i = sweepline; s > 0 ? i <= result.sweepLine : i >= result.sweepLine; i += s) {
-                    ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-                    // Redraw edges
-                    edges?.forEach(edge => {
-                        drawEdge(edge);
-                    });
-
-                    points.forEach(point => {
-                        drawPoint(point, point.y > i ? "white" : point.y === i ? "red" : "blue");
-                    });
-
-                    // Draw moving sweep line
-                    drawHorizontalLine(i, "red");
-
-                    if (arcs && showBeachline) {
-                        drawArcs(arcs, i, "blue", 0, canvas.width)
-                    }
-                    if (result.circleEvents && showCircles) {
-                        result.circleEvents.forEach(circleEvent => {
-                            drawCircle(circleEvent.x, circleEvent.y, circleEvent.radius);
-                        });
-                    }
-
-                    await sleep(sleepTime); // Smooth transition delay (adjust as needed)
+        let s = Math.abs(sweepline, result.sweepLine) < 0.001 ? 0 : sweepline < result.sweepLine ? 1 : -1; // Determine direction
+        if (s !== 0) {
+            let arcs = result.beachlineArcs;
+            let edges = prevEdges.pop();
+            if (s < 0) {
+                arcs = prevLines.pop()
+                edges = result.edges;
+            } else if (s > 0) {
+                prevLines.push(arcs)
+                if (edges) {
+                    prevEdges.push(edges);
                 }
+                prevEdges.push(result.edges);
+            }
+            if (smooth) {
+                // Smoothly move the sweep line
 
+                if (sweepline !== result.sweepLine) {
+
+                    let sleepTime = 500 / Math.abs(result.sweepLine - sweepline)
+
+                    for (let i = sweepline; s > 0 ? i <= result.sweepLine : i >= result.sweepLine; i += s) {
+                        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+                        // Redraw edges
+                        edges?.forEach(edge => {
+                            drawEdge(edge);
+                        });
+
+                        points.forEach(point => {
+                            drawPoint(point, point.y > i ? "white" : point.y === i ? "red" : "blue");
+                        });
+
+                        // Draw moving sweep line
+                        drawHorizontalLine(i, "red");
+
+                        if (arcs && showBeachline) {
+                            drawArcs(arcs, i, "blue", 0, canvas.width)
+                        }
+                        if (result.circleEvents && showCircles) {
+                            result.circleEvents.forEach(circleEvent => {
+                                drawCircle(circleEvent.x, circleEvent.y, circleEvent.radius);
+                            });
+                        }
+
+                        await sleep(sleepTime); // Smooth transition delay (adjust as needed)
+                    }
+
+                }
+            } else {
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
             }
         } else {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -580,6 +586,8 @@ function drawPoint(point, color) {
     ctx.beginPath();
     ctx.arc(point.x, point.y, pointRadius, 0, 2 * Math.PI);
     ctx.fillStyle = color;
+    ctx.strokeStyle = "black"; // Set the circle color
+    ctx.lineWidth = 2; // Set the line width
     ctx.fill();
     ctx.stroke();
 }
