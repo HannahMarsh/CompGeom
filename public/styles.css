@@ -8,8 +8,12 @@ body {
     background-color: #f7ebff;
 }
 
+.top-info {
+    text-align: center;
+}
+
 h1 {
-    margin-bottom: 50px;
+    margin-bottom: 40px;
     margin-top: 40px;
     font-weight: 300;
     letter-spacing: -1px;

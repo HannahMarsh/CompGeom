@@ -77,7 +77,7 @@ function drawVoronoi() {
         finalEdges = result.edges;
 
         result.edges.forEach(edge => {
-            console.log(`Edge from (${edge.vb.x}, ${edge.vb.y}) to (${edge.va.x}, ${edge.va.y})`);
+            //console.log(`Edge from (${edge.vb.x}, ${edge.vb.y}) to (${edge.va.x}, ${edge.va.y})`);
             drawEdge(edge);
         });
 
