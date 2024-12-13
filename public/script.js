@@ -208,6 +208,7 @@ function enableButton(buttonId) {
 function startOver() {
     step = 0;
     started = false;
+    sweepline = 0;
     document.getElementById("i-num").innerText = step;
     disableButton("next-button");
     disableButton("back-button");
@@ -302,8 +303,12 @@ document.getElementById("fast-forward-button").addEventListener("click", () => {
     console.log("Fast forward.");
     for (let i = 0; i < 3; i++) {
         if (!isDone && !document.getElementById("next-button").disabled) {
-            document.getElementById("next-button").click();
-            console.log("Clicked Next.");
+            enableButton("back-button");
+            nextStep(false);
+            if (isDone) {
+                disableButton("next-button");
+                startOver();
+            }
         }
     }
 });
@@ -311,7 +316,7 @@ document.getElementById("fast-forward-button").addEventListener("click", () => {
 document.getElementById("next-button").addEventListener("click", () => {
     console.log("Next.");
     enableButton("back-button");
-    nextStep();
+    nextStep(true);
     if (isDone) {
         disableButton("next-button");
         startOver();
@@ -350,32 +355,54 @@ function initializeAlgorithm() {
     step = 0;
     document.getElementById("i-num").innerText = step;
     let result = voronoi.computeStepByStep(points, bbox, step);
-    drawResult(result);
+    drawResult(result, false);
 }
 
-function nextStep() {
-    const bbox = { xl: 0, xr: canvas.width, yt: 0, yb: canvas.height };
+async function nextStep(smooth) {
+    const bbox = {xl: 0, xr: canvas.width, yt: 0, yb: canvas.height};
 
     // for (;;) {
     //     let oldsweep = sweepline;
+
+    if (smooth) {
+        if (isAnimating) {
+            return;
+        }
+        isAnimating = true;
         step++;
         document.getElementById("i-num").innerText = step;
         let result = voronoi.computeStepByStep(points, bbox, step);
-        drawResult(result);
-        // if (oldsweep !== result.sweepLine) {
-        //     break;
-        // }
         if (result.i < step) {
             isDone = true;
-           // break;
+            // break;
         }
+        try {
+            await drawResult(result, smooth);
+        } finally {
+            isAnimating = false;
+        }
+
+    } else {
+        step++;
+        document.getElementById("i-num").innerText = step;
+        let result = voronoi.computeStepByStep(points, bbox, step);
+        drawResult(result, smooth);
+        if (result.i < step) {
+            isDone = true;
+            // break;
+        }
+    }
+    // if (oldsweep !== result.sweepLine) {
+    //     break;
+    // }
+
     //}
 }
 
 function redraw() {
     const bbox = { xl: 0, xr: canvas.width, yt: 0, yb: canvas.height };
     let result = voronoi.computeStepByStep(points, bbox, step);
-    drawResult(result);
+    drawResult(result, false);
 }
 
 function backStep() {
@@ -383,30 +410,7 @@ function backStep() {
     step--;
     document.getElementById("i-num").innerText = step;
     let result = voronoi.computeStepByStep(points, bbox, step);
-    drawResult(result);
-}
-
-function visualizeStep(stepp) {
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    drawPoints();
-    stepp.beachline.forEach(section => {
-        drawParabola(section.site, voronoi.bbox.yt);
-    });
-    stepp.edges.forEach(edge => {
-        drawEdge(edge);
-    });
-}
-
-function drawParabola(focus, directrix) {
-    ctx.beginPath();
-    const step = 1; // Precision
-    for (let x = 0; x < canvas.width; x += step) {
-        const y = ((x - focus.x) ** 2) / (2 * (focus.y - directrix)) + (focus.y + directrix) / 2;
-        if (x === 0) ctx.moveTo(x, y);
-        else ctx.lineTo(x, y);
-    }
-    ctx.strokeStyle = "red";
-    ctx.stroke();
+    drawResult(result, true);
 }
 
 function drawEdge(edge) {
@@ -434,22 +438,83 @@ function drawEdge(edge) {
 // }
 
 
-function drawResult(result) {
+let prevLines = [];
+let prevEdges = [];
+let isAnimating = false;
+
+async function drawResult(result, smooth) {
+
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     result.edges.forEach(edge => {
-        console.log(`Edge from (${edge.vb.x}, ${edge.vb.y}) to (${edge.va.x}, ${edge.va.y})`);
         drawEdge(edge);
     });
-    drawPoints(); // Redraw points on top
-    if (result.sweepLine) {
-        points.forEach((point, index) => {
-            drawPoint(point, point.y > result.sweepLine ? "white" : point.y === result.sweepLine ? "red" : "blue")
-        });
-        drawHorizontalLine(result.sweepLine, "red");
-        sweepline = result.sweepLine;
+    points.forEach(point => {
+        drawPoint(point, "blue");
+    });
 
+    if (result.sweepLine) {
+        let s = sweepline < result.sweepLine ? 1 : -1; // Determine direction
+        let arcs = result.beachlineArcs;
+        let edges = prevEdges.pop();
+        if (s < 0) {
+            arcs = prevLines.pop()
+            edges = result.edges;
+        } else if (s > 0) {
+            prevLines.push(arcs)
+            if (edges) {
+                prevEdges.push(edges);
+            }
+            prevEdges.push(result.edges);
+        }
+        if (smooth) {
+            // Smoothly move the sweep line
+
+            if (sweepline !== result.sweepLine) {
+
+                let sleepTime = 500 / Math.abs(result.sweepLine - sweepline)
+
+                for (let i = sweepline; s > 0 ? i <= result.sweepLine : i >= result.sweepLine; i += s) {
+                    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+                    // Redraw edges
+                    edges?.forEach(edge => {
+                        drawEdge(edge);
+                    });
+
+                    points.forEach(point => {
+                        drawPoint(point, point.y > i ? "white" : point.y === i ? "red" : "blue");
+                    });
+
+                    // Draw moving sweep line
+                    drawHorizontalLine(i, "red");
+
+                    if (arcs && showBeachline) {
+                        drawArcs(arcs, i, "blue")
+                    }
+                    if (result.circleEvents && showCircles) {
+                        result.circleEvents.forEach(circleEvent => {
+                            drawCircle(circleEvent.x, circleEvent.y, circleEvent.radius);
+                        });
+                    }
+
+                    await sleep(sleepTime); // Smooth transition delay (adjust as needed)
+                }
+
+            }
+        } else {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+        }
+        sweepline = result.sweepLine;
+        drawHorizontalLine(sweepline, "red");
+
+        result.edges.forEach(edge => {
+            drawEdge(edge);
+        });
+        points.forEach(point => {
+            drawPoint(point, point.y > sweepline ? "white" : point.y === sweepline ? "red" : "blue");
+        });
         if (result.beachlineArcs && showBeachline) {
-            drawArcs(result.beachlineArcs, result.sweepLine, "blue")
+            drawArcs(result.beachlineArcs, sweepline, "blue")
         }
         if (result.circleEvents && showCircles) {
             result.circleEvents.forEach(circleEvent => {
@@ -457,7 +522,6 @@ function drawResult(result) {
             });
         }
     }
-
 
 }
 
@@ -512,6 +576,10 @@ function drawHorizontalLine(y, color) {
     ctx.lineTo(canvas.width, y);
     ctx.strokeStyle = color;
     ctx.stroke();
+}
+
+function sleep(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
 }
 
 function drawCircle(x, y, r) {
