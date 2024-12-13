@@ -247,6 +247,7 @@ let started = false;
 document.getElementById("visualize-fortune-button").addEventListener("click", () => {
     if (started === false) {
         started = true;
+        isDone = false;
         console.log("Algorithm started");
         disableButton("back-button");
         enableButton("next-button");
@@ -313,10 +314,10 @@ document.getElementById("fast-forward-button").addEventListener("click", () => {
     }
 });
 
-document.getElementById("next-button").addEventListener("click", () => {
+document.getElementById("next-button").addEventListener("click", async () => {
     console.log("Next.");
     enableButton("back-button");
-    nextStep(true);
+    await nextStep(true);
     if (isDone) {
         disableButton("next-button");
         startOver();
@@ -489,7 +490,7 @@ async function drawResult(result, smooth) {
                     drawHorizontalLine(i, "red");
 
                     if (arcs && showBeachline) {
-                        drawArcs(arcs, i, "blue")
+                        drawArcs(arcs, i, "blue", 0, canvas.width)
                     }
                     if (result.circleEvents && showCircles) {
                         result.circleEvents.forEach(circleEvent => {
@@ -514,7 +515,7 @@ async function drawResult(result, smooth) {
             drawPoint(point, point.y > sweepline ? "white" : point.y === sweepline ? "red" : "blue");
         });
         if (result.beachlineArcs && showBeachline) {
-            drawArcs(result.beachlineArcs, sweepline, "blue")
+            drawArcs(result.beachlineArcs, sweepline, "blue", 0, canvas.width)
         }
         if (result.circleEvents && showCircles) {
             result.circleEvents.forEach(circleEvent => {
@@ -525,7 +526,11 @@ async function drawResult(result, smooth) {
 
 }
 
-function drawArcs(beachlineArcs, sweepLine, color) {
+function drawParabola(h, k, d, color) {
+
+}
+
+function drawArcs(beachlineArcs, sweepLine, color, lbox, rbox) {
     ctx.beginPath();
 
     beachlineArcs.forEach(arc => {
@@ -534,12 +539,21 @@ function drawArcs(beachlineArcs, sweepLine, color) {
         const d = sweepLine;
 
         // Calculate parabola for x values between breakpoints
-        const left = arc.leftBreakpoint;
-        const right = arc.rightBreakpoint;
+        let left = arc.leftBreakpoint;
+        let right = arc.rightBreakpoint;
 
-        if (left === -Infinity || right === Infinity || d === k) {
+        if (Math.abs(d - k) < 0.001) {
             // Skip infinite or degenerate cases
+            console.log("Degenerate case");
             return;
+        }
+
+        if (left === -Infinity) {
+            left = lbox;
+        }
+
+        if (right === Infinity) {
+            right = rbox;
         }
 
         const st = (right - left) / 1000; // Adjust step size for smoothness
