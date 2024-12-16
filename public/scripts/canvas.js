@@ -132,50 +132,14 @@ class Canvas {
       console.log("Computing Voronoi diagram.")
       let finalResult = this.voronoi.compute(this.points, this.bbox);
 
-      for (let i = 0; i <= finalResult.i; i++) {
+      let lastsweepLine = -1;
+      for (let i = finalResult.i; i >= 0; i--) {
         let result = this.voronoi.computeStepByStep(this.points, this.bbox, i);
-        this.results.push(result);
-        // if (i === 0) {
-        //   this.results[0].sweepLine = Math.min(this.bbox.yt, this.bbox.yb);
-        //   this.results.push(result);
-        // } else if (i === finalResult.i) {
-        //   this.results.push(result);
-        //   this.results[this.results.length - 1].sweepLine = Math.max(this.bbox.yt, this.bbox.yb);
-        // } else {
-        //   this.results[i - 1].beachlineArcs = result.beachlineArcs;
-        // }
+        if (result.sweepLine !== lastsweepLine) {
+          lastsweepLine = result.sweepLine;
+          this.results.unshift(result);
+        }
       }
-      let edges = this.results.map(result => result.edges);
-      let beachlineArcs = this.results.map(result => result.beachlineArcs);
-      let sweeplines = this.results.map(result => result.sweepLine);
-      let circleEvents = this.results.map(result => result.circleEvents);
-
-      let newResults = [];
-
-      newResults.push({
-          edges: edges[0],
-          beachlineArcs: beachlineArcs[1],
-          sweepLine: Math.min(this.bbox.yt, this.bbox.yb),
-          circleEvents: circleEvents[1]
-      });
-
-      for (let i = 0; i < this.results.length - 1; i++) {
-          newResults.push({
-              edges: edges[i],
-              beachlineArcs: beachlineArcs[i + 1],
-              sweepLine: sweeplines[i],
-              circleEvents: circleEvents[i + 1]
-          });
-      }
-
-      newResults.push({
-        edges: edges[this.results.length - 1],
-        beachlineArcs: beachlineArcs[this.results.length - 1],
-        sweepLine: Math.max(this.bbox.yt, this.bbox.yb),
-        circleEvents: circleEvents[this.results.length - 1]
-      });
-
-      this.results = newResults;
 
       if (!this.initialized) {
         this.step = this.results.length - 1; //finalResult.i;
@@ -473,52 +437,9 @@ class Canvas {
     let currentSweepLine = currentResult.sweepLine;
     let nextSweepLine = nextResult.sweepLine;
 
-    // let lastBeachlineArcs = lastResult.beachlineArcs;
-    // let currentBeachlineArcs = currentResult.beachlineArcs;
-    // let nextBeachlineArcs = nextResult.beachlineArcs;
-    //
-    // let lastCircleEvents = lastResult.circleEvents;
-    // let currentCircleEvents = currentResult.circleEvents;
-    // let nextCircleEvents = nextResult.circleEvents;
-
-    //
-    // if (previous && currentStep < 0) {
-    //   currentStep = this.results.length - 1;
-    //   lastStep = currentStep;
-    // } else if (!previous && currentStep >= this.results.length) {
-    //   currentStep = 0;
-    //   lastStep = currentStep;
-    // }
-    //
-    // let lastResult = this.GetCurrentResult();
-    // this.step = currentStep;
-    // let nextResult = this.GetCurrentResult();
-    //
-    //
-    // let lastSweepLine = lastResult.sweepLine;
-    // let nextSweepLine = nextResult.sweepLine;
-    //
-    // if (lastStep === currentStep) {
-    //   if (lastStep === 0) {
-    //     if (previous) {
-    //       nextSweepLine = Math.min(this.bbox.yt, this.bbox.yb);
-    //       lastResult = nextResult;
-    //     } else {
-    //       lastSweepLine = Math.min(this.bbox.yt, this.bbox.yb);
-    //       nextResult = lastResult;
-    //     }
-    //   } else {
-    //     if (previous) {
-    //       lastSweepLine = Math.max(this.bbox.yt, this.bbox.yb);
-    //       nextResult = lastResult;
-    //     } else {
-    //       nextSweepLine = Math.max(this.bbox.yt, this.bbox.yb);
-    //       lastResult = nextResult;
-    //     }
-    //   }
-    //   //lastSweepLine = previous ? Math.max(this.bbox.yt, this.bbox.yb) : Math.min(this.bbox.yt, this.bbox.yb);
-    //
-    // }
+    if (lastStep === currentStep && lastStep === 0 && !previous) {
+      lastSweepLine = Math.min(this.bbox.yt, this.bbox.yb);
+    }
 
     if (smooth && (lastSweepLine !== currentSweepLine)) {
 
@@ -528,7 +449,7 @@ class Canvas {
         valuesOfI.push(i);
       }
 
-      this.Animate(valuesOfI, 0, lastResult, autoPlay);
+      this.Animate(valuesOfI, 0, currentResult, autoPlay);
 
     }
     this.DrawCurrentState();
