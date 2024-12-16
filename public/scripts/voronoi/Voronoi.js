@@ -1309,7 +1309,7 @@ Voronoi.prototype.computeStepByStep = function(sites, bbox, step) {
     }
 
     // clean up
-    //this.reset();
+    this.reset();
 
     return diagram;
 };
