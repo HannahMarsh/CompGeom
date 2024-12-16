@@ -53,13 +53,14 @@ function addPoint(x, y) {
     if (!point) {
         points.push({ x, y });
         console.log(`Added point at (${x}, ${y}).`);
+        document.getElementById("n").innerText = `${points.length}`;
     }
 }
 
 // Function to compute and draw Voronoi diagram
 function drawVoronoi() {
 
-    console.log(`Canvas dimensions: ${canvas.width} x ${canvas.height}`)
+   // console.log(`Canvas dimensions: ${canvas.width} x ${canvas.height}`)
     //console.log("Drawing Voronoi diagram...");
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     drawPoints();
@@ -86,6 +87,10 @@ function drawVoronoi() {
     } else if (points.length === 1) {
         drawPoints();
     }
+}
+
+function updateSweepLine(y) {
+    document.getElementById("sweep-line").innerText = `y = ${Math.round(y)}`;
 }
 
 // Function to draw all points
@@ -165,6 +170,7 @@ canvas.addEventListener("mouseup", () => {
 // Clear all points
 function clearAllPoints() {
     points.length = 0;
+    document.getElementById("n").innerText = `0`;
     console.log("Cleared all points.");
     drawVoronoi();
     updateTable();
@@ -512,6 +518,10 @@ async function drawResult(result, smooth) {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
         }
         sweepline = result.sweepLine;
+        updateSweepLine(sweepline);
+
+        document.getElementById("arcs").innerText = `${result.beachlineArcs.length}`;
+        document.getElementById("breakpoints").innerText = result.beachlineArcs.map(arc => `(${Math.round(arc.leftBreakpoint)}, ${Math.round(arc.rightBreakpoint)})`).join(",\n").replaceAll(`Infinity`, `∞`);
         drawHorizontalLine(sweepline, "red");
 
         result.edges.forEach(edge => {

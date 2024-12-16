@@ -12,6 +12,24 @@ body {
     text-align: center;
 }
 
+#variables-table, #variables-table td, #variables-table tr {
+    border: none;
+    width: auto; /* Let the table shrink to fit its content */
+    table-layout: auto; /* Columns adjust to content width */
+    border-collapse: collapse; /* Ensures minimal spacing around borders */
+}
+
+td.var-name {
+    font-weight: bold;
+    width: auto;
+    text-align: left;
+}
+
+td.var-value {
+    text-align: left;
+    width: auto;
+}
+
 h1 {
     margin-bottom: 40px;
     margin-top: 40px;
@@ -160,7 +178,9 @@ button:disabled {
     margin-top: 20px;
     padding: 15px;
     width: 100%;
-    background-color: #ffffff;
+    /*background-color: #ffffff;*/
+
+    background-color: #fef7ff;
     border: 1px solid #ddd;
     border-radius: 5px;
     box-shadow: 0px 0px 10px rgba(0, 0, 0, 0.1);
