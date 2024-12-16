@@ -1160,8 +1160,11 @@ Voronoi.prototype.compute = function(sites, bbox) {
         cells = this.cells,
         circle;
 
+    let step_i = -1;
+
     // main loop
     for (;;) {
+        step_i++;
         // we need to figure whether we handle a site or circle event
         // for this we find out if there is a site event and it is
         // 'earlier' than the circle event
@@ -1213,6 +1216,7 @@ Voronoi.prototype.compute = function(sites, bbox) {
     diagram.edges = this.edges;
     diagram.vertices = this.vertices;
     diagram.execTime = stopTime.getTime()-startTime.getTime();
+    diagram.i = step_i;
 
     // clean up
     this.reset();
