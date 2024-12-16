@@ -304,22 +304,64 @@ class Canvas {
     this.ctx.stroke();
   }
 
+  DrawBeachLines2(sweepLine, color = "blue") {
+    let sites = this.points.filter(point => point.y < sweepLine);
+    let left = Math.min(this.bbox.xl, this.bbox.xr);
+    let right = Math.max(this.bbox.xl, this.bbox.xr);
+    let step = (Math.abs(left - right)) / 1000;
+    let first = false;
+
+    this.ctx.beginPath();
+
+    for (let x = left; x <= right; x += step) {
+      let y = Math.max(...sites.map(site => {
+        let h = site.x;
+        let k = site.y;
+        let d = sweepLine;
+        return ((x - h) ** 2) / (2 * (k - d)) + (k + d) / 2;
+      }))
+
+
+
+      if (y < Math.max(this.bbox.yt, this.bbox.yb) && y > Math.min(this.bbox.yt, this.bbox.yb)) {
+        if (first) {
+          this.ctx.lineTo(x, y);
+        } else {
+          first = true;
+        }
+        this.ctx.moveTo(x, y);
+        this.ctx.strokeStyle = color;
+        this.ctx.lineWidth = 2;
+        this.ctx.stroke();
+      }
+
+    }
+  }
+
   DrawBeachLines(result = null, sweepLine = -1, color = "blue") {
-    if (!result) {
-      result = this.GetCurrentResult();
-      if (result && (sweepLine === -1)) {
-        sweepLine = result.sweepLine;
+    if (result) {
+      if (this.showBeachline) {
+        this.DrawBeachLines2(sweepLine, color);
+        return true;
       }
     }
-
-    let drewBeachLines = false;
-    if (this.showBeachline && result) {
-      result.beachlineArcs?.forEach(arc => {
-        this.DrawParabola(arc, sweepLine, color);
-        drewBeachLines = true;
-      });
-    }
-    return drewBeachLines;
+    return false;
+    //
+    // if (!result) {
+    //   result = this.GetCurrentResult();
+    //   if (result && (sweepLine === -1)) {
+    //     sweepLine = result.sweepLine;
+    //   }
+    // }
+    //
+    // let drewBeachLines = false;
+    // if (this.showBeachline && result) {
+    //   result.beachlineArcs?.forEach(arc => {
+    //     this.DrawParabola(arc, sweepLine, color);
+    //     drewBeachLines = true;
+    //   });
+    // }
+    // return drewBeachLines;
   }
 
   DrawCircle(circleEvent, lineColor = "purple", centerColor = "red") {
@@ -409,7 +451,7 @@ class Canvas {
 
   Transition(smooth = true, previous = false, autoPlay = false) {
 
-    if ((this.points?.length ?? 0) < 2 || this.results.length <= 3) {
+    if ((this.points?.length ?? 0) < 2 || this.results.length <= 1) {
         return false;
     }
 
