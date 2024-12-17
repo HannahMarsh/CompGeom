@@ -118,13 +118,13 @@ class Voronoi {
 
     // utility functions for floating point stuff
 
-    equalWithEpsilon(a, b) {
+    eqEps(a, b) {
         return Math.abs(a - b) < 1e-9;
     }
-    greaterThanWithEpsilon(a, b) {
+    gtEps(a, b) {
         return a - b > 1e-9;
     }
-    lessThanWithEpsilon(a, b) {
+    ltEps(a, b) {
         return b - a > 1e-9;
     }
 
@@ -163,80 +163,29 @@ class Voronoi {
         return edge;
     }
 
-    leftBreakPoint(arc, directrix) {
-        // http://en.wikipedia.org/wiki/Parabola
-        // http://en.wikipedia.org/wiki/Quadratic_equation
-        // h1 = x1,
-        // k1 = (y1+directrix)/2,
-        // h2 = x2,
-        // k2 = (y2+directrix)/2,
-        // p1 = k1-directrix,
-        // a1 = 1/(4*p1),
-        // b1 = -h1/(2*p1),
-        // c1 = h1*h1/(4*p1)+k1,
-        // p2 = k2-directrix,
-        // a2 = 1/(4*p2),
-        // b2 = -h2/(2*p2),
-        // c2 = h2*h2/(4*p2)+k2,
-        // x = (-(b2-b1) + Math.sqrt((b2-b1)*(b2-b1) - 4*(a2-a1)*(c2-c1))) / (2*(a2-a1))
-        // When x1 become the x-origin:
-        // h1 = 0,
-        // k1 = (y1+directrix)/2,
-        // h2 = x2-x1,
-        // k2 = (y2+directrix)/2,
-        // p1 = k1-directrix,
-        // a1 = 1/(4*p1),
-        // b1 = 0,
-        // c1 = k1,
-        // p2 = k2-directrix,
-        // a2 = 1/(4*p2),
-        // b2 = -h2/(2*p2),
-        // c2 = h2*h2/(4*p2)+k2,
-        // x = (-b2 + Math.sqrt(b2*b2 - 4*(a2-a1)*(c2-k1))) / (2*(a2-a1)) + x1
+    leftBreakPoint(arc, sweepLineY) {
+        if (this.eqEps(arc.site.y, sweepLineY)) return arc.site.x; // degenerate case: focus is on the sweepLineY
+        if (!arc.rbPrevious) return -Infinity; // no predecessor means breakpoint is at -Infinity
+        if (this.eqEps(arc.rbPrevious.site.y, sweepLineY)) return arc.rbPrevious.site.x; // degenerate case: left focus is on the sweepLineY
+        const hl = arc.rbPrevious.site.x - arc.site.x; // horizontal distance between focuses
+        const aby2 = (1 / (arc.site.y - sweepLineY)) - (1 / (arc.rbPrevious.site.y - sweepLineY)); // difference in coefficients
+        if (!aby2) return (arc.site.x + arc.rbPrevious.site.x) / 2; // special case: parabolas are equidistant so return midpoint between focus
 
-        // change code below at your own risk: care has been taken to
-        // reduce errors due to computers' finite arithmetic precision.
-        // Maybe can still be improved, will see if any more of this
-        // kind of errors pop up again.
-        var site = arc.site,
-            rfocx = site.x,
-            rfocy = site.y,
-            pby2 = rfocy - directrix;
-        // parabola in degenerate case where focus is on directrix
-        if (!pby2) {
-            return rfocx;
-        }
-        var lArc = arc.rbPrevious;
-        if (!lArc) {
-            return -Infinity;
-        }
-        site = lArc.site;
-        var lfocx = site.x,
-            lfocy = site.y,
-            plby2 = lfocy - directrix;
-        // parabola in degenerate case where focus is on directrix
-        if (!plby2) {
-            return lfocx;
-        }
-        var hl = lfocx - rfocx,
-            aby2 = 1 / pby2 - 1 / plby2,
-            b = hl / plby2;
-        if (aby2) {
-            return (-b + Math.sqrt(b * b - 2 * aby2 * (hl * hl / (-2 * plby2) - lfocy + plby2 / 2 + rfocy - pby2 / 2))) / aby2 + rfocx;
-        }
-        // both parabolas have same distance to directrix, thus break point is midway
-        return (rfocx + lfocx) / 2;
+        // solve for the breakpoint using quadratic formula
+        const b = hl / (arc.rbPrevious.site.y - sweepLineY); // linear term in the quadratic equation
+        const discriminant = (b * b) - (2 * aby2) * (
+            (hl * hl / (-2 * (arc.rbPrevious.site.y - sweepLineY))) - arc.rbPrevious.site.y +
+            ((arc.rbPrevious.site.y - sweepLineY) / 2) + arc.site.y - ((arc.site.y - sweepLineY) / 2)
+        );
+        return (-b + Math.sqrt(discriminant)) / aby2 + arc.site.x;
     }
 
-    // calculate the right break point of a particular beach section,
-    // given a particular directrix
-    rightBreakPoint(arc, directrix) {
-        var rArc = arc.rbNext;
-        if (rArc) {
-            return this.leftBreakPoint(rArc, directrix);
-        }
-        var site = arc.site;
-        return site.y === directrix ? site.x : Infinity;
+    rightBreakPoint(arc, sweepLineY) {
+        // the right breakpoint is the left breakpoint of the right neighbor
+        if (arc.rbNext) return this.leftBreakPoint(arc.rbNext, sweepLineY);
+
+        // fallback: if no right neighbor exists
+        return arc.site.y === sweepLineY ? arc.site.x : Infinity;
     }
 
 
@@ -245,321 +194,201 @@ class Voronoi {
         this.beachline.Remove(beachsection); // remove from RB-tree
     }
 
-
     removeBeachsection(beachsection) {
-        var circle = beachsection.circleEvent,
-            x = circle.x,
-            y = circle.ycenter,
-            vertex = this.createVertex(x, y),
-            previous = beachsection.rbPrevious,
-            next = beachsection.rbNext,
-            disappearingTransitions = [beachsection],
-            abs_fn = Math.abs;
+        const circle = beachsection.circleEvent;
+        const x = circle.x;
+        const y = circle.ycenter;
+        const vertex = this.createVertex(x, y);
 
-        // remove collapsed beachsection from beachline
+        // get neighboring arcs
+        let previous = beachsection.rbPrevious;
+        let next = beachsection.rbNext;
+        const disappearingTransitions = [beachsection];
+        const abs_fn = Math.abs;
+
+        // remove the collapsed beach section from the beachline
         this.detachBeachsection(beachsection);
 
-        // there could be more than one empty arc at the deletion point, this
-        // happens when more than two edges are linked by the same vertex,
-        // so we will collect all those edges by looking up both sides of
-        // the deletion point.
-        // by the way, there is *always* a predecessor/successor to any collapsed
-        // beach section, it's just impossible to have a collapsing first/last
-        // beach sections on the beachline, since they obviously are unconstrained
-        // on their left/right side.
-
         // look left
-        var lArc = previous;
+        let lArc = previous;
         while (lArc.circleEvent && abs_fn(x - lArc.circleEvent.x) < 1e-9 && abs_fn(y - lArc.circleEvent.ycenter) < 1e-9) {
             previous = lArc.rbPrevious;
             disappearingTransitions.unshift(lArc);
-            this.detachBeachsection(lArc); // mark for reuse
+            this.detachBeachsection(lArc);
             lArc = previous;
         }
-        // even though it is not disappearing, I will also add the beach section
-        // immediately to the left of the left-most collapsed beach section, for
-        // convenience, since we need to refer to it later as this beach section
-        // is the 'left' site of an edge for which a start point is set.
+
+        // add the leftmost arc
         disappearingTransitions.unshift(lArc);
         this.detachCircleEvent(lArc);
 
         // look right
-        var rArc = next;
+        let rArc = next;
         while (rArc.circleEvent && abs_fn(x - rArc.circleEvent.x) < 1e-9 && abs_fn(y - rArc.circleEvent.ycenter) < 1e-9) {
             next = rArc.rbNext;
             disappearingTransitions.push(rArc);
-            this.detachBeachsection(rArc); // mark for reuse
+            this.detachBeachsection(rArc);
             rArc = next;
         }
-        // we also have to add the beach section immediately to the right of the
-        // right-most collapsed beach section, since there is also a disappearing
-        // transition representing an edge's start point on its left.
+
+        // add the rightmost arc
         disappearingTransitions.push(rArc);
         this.detachCircleEvent(rArc);
 
-        // walk through all the disappearing transitions between beach sections and
-        // set the start point of their (implied) edge.
-        var nArcs = disappearingTransitions.length,
-            iArc;
-        for (iArc = 1; iArc < nArcs; iArc++) {
+        // set the start point for edges between disappearing transitions
+        const nArcs = disappearingTransitions.length;
+        for (let iArc = 1; iArc < nArcs; iArc++) {
             rArc = disappearingTransitions[iArc];
             lArc = disappearingTransitions[iArc - 1];
             rArc.edge.setEdgeStartpoint(lArc.site, rArc.site, vertex);
         }
 
-        // create a new edge as we have now a new transition between
-        // two beach sections which were previously not adjacent.
-        // since this edge appears as a new vertex is defined, the vertex
-        // actually define an end point of the edge (relative to the site
-        // on the left)
+        // create a new edge between leftmost and rightmost arcs
         lArc = disappearingTransitions[0];
         rArc = disappearingTransitions[nArcs - 1];
         rArc.edge = this.createEdge(lArc.site, rArc.site, undefined, vertex);
 
-        // create circle events if any for beach sections left in the beachline
-        // adjacent to collapsed sections
+        // check for circle events
         this.attachCircleEvent(lArc);
         this.attachCircleEvent(rArc);
     }
 
     addBeachsection(site) {
-        var x = site.x,
-            directrix = site.y;
+        const x = site.x, directrix = site.y;
+        let lArc, rArc, dxl, dxr;
 
-        // find the left and right beach sections which will surround the newly
-        // created beach section.
-        // This loop is one of the most often executed,
-        // hence we expand in-place the comparison-against-epsilon calls.
-        var lArc, rArc,
-            dxl, dxr,
-            node = this.beachline.root;
-
+        let node = this.beachline.root;
         while (node) {
             dxl = this.leftBreakPoint(node, directrix) - x;
-            // x lessThanWithEpsilon xl => falls somewhere before the left edge of the beachsection
             if (dxl > 1e-9) {
-                // this case should never happen
-                // if (!node.rbLeft) {
-                //    rArc = node.rbLeft;
-                //    break;
-                //    }
-                node = node.rbLeft;
+                node = node.rbLeft; // move left if x falls before the left edge
             } else {
                 dxr = x - this.rightBreakPoint(node, directrix);
-                // x greaterThanWithEpsilon xr => falls somewhere after the right edge of the beachsection
                 if (dxr > 1e-9) {
-                    if (!node.rbRight) {
-                        lArc = node;
-                        break;
-                    }
-                    node = node.rbRight;
+                    node = node.rbRight; // move right if x falls after the right edge
                 } else {
-                    // x equalWithEpsilon xl => falls exactly on the left edge of the beachsection
                     if (dxl > -1e-9) {
                         lArc = node.rbPrevious;
                         rArc = node;
-                    }
-                    // x equalWithEpsilon xr => falls exactly on the right edge of the beachsection
-                    else if (dxr > -1e-9) {
+                    } else if (dxr > -1e-9) {
                         lArc = node;
                         rArc = node.rbNext;
-                    }
-                    // falls exactly somewhere in the middle of the beachsection
-                    else {
-                        lArc = rArc = node;
+                    } else {
+                        lArc = rArc = node; // x falls within the existing arc
                     }
                     break;
                 }
             }
         }
-        // at this point, keep in mind that lArc and/or rArc could be
-        // undefined or null.
 
-        // create a new beach section object for the site and add it to RB-tree
-        var newArc = new Beachsection(site);
+        const newArc = new Beachsection(site);
         this.beachline.Insert(lArc, newArc);
 
-        // cases:
-        //
-
-        // [null,null]
-        // least likely case: new beach section is the first beach section on the
-        // beachline.
-        // This case means:
-        //   no new transition appears
-        //   no collapsing beach section
-        //   new beachsection become root of the RB-tree
+        // case 1: first beach section on the beachline
         if (!lArc && !rArc) {
             return;
         }
 
-        // [lArc,rArc] where lArc == rArc
-        // most likely case: new beach section split an existing beach
-        // section.
-        // This case means:
-        //   one new transition appears
-        //   the left and right beach section might be collapsing as a result
-        //   two new nodes added to the RB-tree
+        // case 2: new section splits an existing section
         if (lArc === rArc) {
-            // invalidate circle event of split beach section
-            this.detachCircleEvent(lArc);
-
-            // split the beach section into two separate beach sections
-            rArc = new Beachsection(lArc.site);
+            this.detachCircleEvent(lArc); // invalidate circle event for the split arc
+            rArc = new Beachsection(lArc.site); // duplicate the split arc
             this.beachline.Insert(newArc, rArc);
 
-            // since we have a new transition between two beach sections,
-            // a new edge is born
+            // create a new edge between the two new transitions
             newArc.edge = rArc.edge = this.createEdge(lArc.site, newArc.site);
 
-            // check whether the left and right beach sections are collapsing
-            // and if so create circle events, to be notified when the point of
-            // collapse is reached.
+            // check for collapsing arcs and create circle events
             this.attachCircleEvent(lArc);
             this.attachCircleEvent(rArc);
             return;
         }
 
-        // [lArc,null]
-        // even less likely case: new beach section is the *last* beach section
-        // on the beachline -- this can happen *only* if *all* the previous beach
-        // sections currently on the beachline share the same y value as
-        // the new beach section.
-        // This case means:
-        //   one new transition appears
-        //   no collapsing beach section as a result
-        //   new beach section become right-most node of the RB-tree
+        // case 3: new section is the last one on the beachline
         if (lArc && !rArc) {
             newArc.edge = this.createEdge(lArc.site, newArc.site);
             return;
         }
 
-        // [null,rArc]
-        // impossible case: because sites are strictly processed from top to bottom,
-        // and left to right, which guarantees that there will always be a beach section
-        // on the left -- except of course when there are no beach section at all on
-        // the beach line, which case was handled above.
-        // No point testing in non-debug version
-        //if (!lArc && rArc) {
-        //    throw "Voronoi.addBeachsection(): What is this I don't even";
-        //    }
-
-        // [lArc,rArc] where lArc != rArc
-        // somewhat less likely case: new beach section falls *exactly* in between two
-        // existing beach sections
-        // This case means:
-        //   one transition disappears
-        //   two new transitions appear
-        //   the left and right beach section might be collapsing as a result
-        //   only one new node added to the RB-tree
+        // case 4: new section falls exactly between two existing sections
         if (lArc !== rArc) {
-            // invalidate circle events of left and right sites
             this.detachCircleEvent(lArc);
             this.detachCircleEvent(rArc);
 
-            // an existing transition disappears, meaning a vertex is defined at
-            // the disappearance point.
-            // since the disappearance is caused by the new beachsection, the
-            // vertex is at the center of the circumscribed circle of the left,
-            // new and right beachsections.
-            // http://mathforum.org/library/drmath/view/55002.html
-            // Except that I bring the origin at A to simplify
-            // calculation
-            var lSite = lArc.site,
-                ax = lSite.x,
-                ay = lSite.y,
-                bx = site.x - ax,
-                by = site.y - ay,
-                rSite = rArc.site,
-                cx = rSite.x - ax,
-                cy = rSite.y - ay,
-                d = 2 * (bx * cy - by * cx),
-                hb = bx * bx + by * by,
-                hc = cx * cx + cy * cy,
-                vertex = this.createVertex((cy * hb - by * hc) / d + ax, (bx * hc - cx * hb) / d + ay);
+            // calculate the new vertex where the old transition disappears
+            const lSite = lArc.site;
+            const ax = lSite.x, ay = lSite.y;
+            const bx = site.x - ax, by = site.y - ay;
+            const rSite = rArc.site;
+            const cx = rSite.x - ax, cy = rSite.y - ay;
 
-            // one transition disappear
-            this.setEdgeStartpoint(rArc.edge, lSite, rSite, vertex);
+            const d = 2 * (bx * cy - by * cx); // determinant
+            const hb = bx * bx + by * by;
+            const hc = cx * cx + cy * cy;
+            const vertex = this.createVertex(
+                (cy * hb - by * hc) / d + ax,
+                (bx * hc - cx * hb) / d + ay
+            );
 
-            // two new transitions appear at the new vertex location
+            // create new edges at the vertex
+            rArc.edge.setEdgeStartpoint(lSite, rSite, vertex);
             newArc.edge = this.createEdge(lSite, site, undefined, vertex);
             rArc.edge = this.createEdge(site, rSite, undefined, vertex);
 
-            // check whether the left and right beach sections are collapsing
-            // and if so create circle events, to handle the point of collapse.
+            // check for potential circle events for the neighboring arcs
             this.attachCircleEvent(lArc);
             this.attachCircleEvent(rArc);
         }
     }
 
     attachCircleEvent(arc) {
-        var lArc = arc.rbPrevious,
-            rArc = arc.rbNext;
-        if (!lArc || !rArc) {
-            return;
-        } // does that ever happen?
-        var lSite = lArc.site,
+        // get the neighboring arcs (left and right)
+        const lArc = arc.rbPrevious, rArc = arc.rbNext;
+
+        // exit early if no valid neighbors exist
+        if (!lArc || !rArc) return;
+
+        // extract site positions for left, current, and right arcs
+        const lSite = lArc.site,
             cSite = arc.site,
             rSite = rArc.site;
 
-        // If site of left beachsection is same as site of
-        // right beachsection, there can't be convergence
-        if (lSite === rSite) {
-            return;
-        }
+        // skip if left and right sites are identical (no valid circle)
+        if (lSite === rSite) return;
 
-        // Find the circumscribed circle for the three sites associated
-        // with the beachsection triplet.
-        // It is more efficient to calculate in-place
-        // rather than getting the resulting circumscribed circle from an
-        // object returned by calling Voronoi.circumcircle()
-        // http://mathforum.org/library/drmath/view/55002.html
-        // Except that I bring the origin at cSite to simplify calculations.
-        // The bottom-most part of the circumcircle is our Fortune 'circle
-        // event', and its center is a vertex potentially part of the final
-        // Voronoi diagram.
-        var bx = cSite.x,
-            by = cSite.y,
-            ax = lSite.x - bx,
-            ay = lSite.y - by,
-            cx = rSite.x - bx,
-            cy = rSite.y - by;
+        // calculate relative positions with origin at cSite
+        const bx = cSite.x, by = cSite.y; // center site (origin)
+        const ax = lSite.x - bx, ay = lSite.y - by; // left site
+        const cx = rSite.x - bx, cy = rSite.y - by; // right site
 
-        // If points l->c->r are clockwise, then center beach section does not
-        // collapse, hence it can't end up as a vertex (we reuse 'd' here, which
-        // sign is reverse of the orientation, hence we reverse the test.
-        // http://en.wikipedia.org/wiki/Curve_orientation#Orientation_of_a_simple_polygon
-        // Nasty finite precision error which caused circumcircle() to
-        // return infinites: 1e-12 seems to fix the problem.
-        var d = 2 * (ax * cy - ay * cx);
-        if (d >= -2e-12) {
-            return;
-        }
+        // check if points l -> c -> r are clockwise; skip if not
+        const d = 2 * (ax * cy - ay * cx); // determinant
+        if (d >= -2e-12) return; // precision safeguard
 
-        var ha = ax * ax + ay * ay,
-            hc = cx * cx + cy * cy,
-            x = (cy * ha - ay * hc) / d,
-            y = (ax * hc - cx * ha) / d,
-            ycenter = y + by;
+        // compute center of the circumcircle relative to cSite
+        const ha = ax * ax + ay * ay; // squared distance from lSite to cSite
+        const hc = cx * cx + cy * cy; // squared distance from rSite to cSite
+        const x = (cy * ha - ay * hc) / d; // x offset
+        const y = (ax * hc - cx * ha) / d; // y offset
+        const ycenter = y + by; // absolute y-coordinate of center
 
-        // Important: ybottom should always be under or at sweep, so no need
-        // to waste CPU cycles by checking
-
-        // recycle circle event object if possible
-        var circleEvent = new CircleEvent();
-
+        // create a new circle event
+        const circleEvent = new CircleEvent();
         circleEvent.arc = arc;
         circleEvent.site = cSite;
-        circleEvent.x = x + bx;
-        circleEvent.y = ycenter + Math.sqrt(x * x + y * y); // y bottom
+        circleEvent.x = x + bx; // absolute x-coordinate of center
+        circleEvent.y = ycenter + Math.sqrt(x * x + y * y); // bottom of the circle
         circleEvent.ycenter = ycenter;
+
+        // attach the circle event to the arc
         arc.circleEvent = circleEvent;
 
-        // find insertion point in RB-tree: circle events are ordered from
-        // smallest to largest
-        var predecessor = null,
-            node = this.circleEvents.root;
+        // find the insertion point in the circle event RB-tree
+        let node = this.circleEvents.root;
+        let predecessor = null;
+
         while (node) {
+            // compare circle events based on y (then x if equal)
             if (circleEvent.y < node.y || (circleEvent.y === node.y && circleEvent.x <= node.x)) {
                 if (node.rbLeft) {
                     node = node.rbLeft;
@@ -576,11 +405,17 @@ class Voronoi {
                 }
             }
         }
+
+        // insert the circle event into the RB-tree
         this.circleEvents.Insert(predecessor, circleEvent);
+
+        // update the first circle event if needed
         if (!predecessor) {
             this.firstCircleEvent = circleEvent;
         }
     }
+
+
 
     detachCircleEvent(arc) {
         var circleEvent = arc.circleEvent;
@@ -913,8 +748,8 @@ class Voronoi {
                     switch (true) {
 
                         // walk downward along left side
-                        case this.equalWithEpsilon(va.x, xl) && this.lessThanWithEpsilon(va.y, yb):
-                            lastBorderSegment = this.equalWithEpsilon(vz.x, xl);
+                        case this.eqEps(va.x, xl) && this.ltEps(va.y, yb):
+                            lastBorderSegment = this.eqEps(vz.x, xl);
                             vb = this.createVertex(xl, lastBorderSegment ? vz.y : yb);
                             edge = this.createBorderEdge(cell.site, va, vb);
                             iLeft++;
@@ -927,8 +762,8 @@ class Voronoi {
                         // fall through
 
                         // walk rightward along bottom side
-                        case this.equalWithEpsilon(va.y, yb) && this.lessThanWithEpsilon(va.x, xr):
-                            lastBorderSegment = this.equalWithEpsilon(vz.y, yb);
+                        case this.eqEps(va.y, yb) && this.ltEps(va.x, xr):
+                            lastBorderSegment = this.eqEps(vz.y, yb);
                             vb = this.createVertex(lastBorderSegment ? vz.x : xr, yb);
                             edge = this.createBorderEdge(cell.site, va, vb);
                             iLeft++;
@@ -941,8 +776,8 @@ class Voronoi {
                         // fall through
 
                         // walk upward along right side
-                        case this.equalWithEpsilon(va.x, xr) && this.greaterThanWithEpsilon(va.y, yt):
-                            lastBorderSegment = this.equalWithEpsilon(vz.x, xr);
+                        case this.eqEps(va.x, xr) && this.gtEps(va.y, yt):
+                            lastBorderSegment = this.eqEps(vz.x, xr);
                             vb = this.createVertex(xr, lastBorderSegment ? vz.y : yt);
                             edge = this.createBorderEdge(cell.site, va, vb);
                             iLeft++;
@@ -955,8 +790,8 @@ class Voronoi {
                         // fall through
 
                         // walk leftward along top side
-                        case this.equalWithEpsilon(va.y, yt) && this.greaterThanWithEpsilon(va.x, xl):
-                            lastBorderSegment = this.equalWithEpsilon(vz.y, yt);
+                        case this.eqEps(va.y, yt) && this.gtEps(va.x, xl):
+                            lastBorderSegment = this.eqEps(vz.y, yt);
                             vb = this.createVertex(lastBorderSegment ? vz.x : xl, yt);
                             edge = this.createBorderEdge(cell.site, va, vb);
                             iLeft++;
@@ -969,7 +804,7 @@ class Voronoi {
                             // fall through
 
                             // walk downward along left side
-                            lastBorderSegment = this.equalWithEpsilon(vz.x, xl);
+                            lastBorderSegment = this.eqEps(vz.x, xl);
                             vb = this.createVertex(xl, lastBorderSegment ? vz.y : yb);
                             edge = this.createBorderEdge(cell.site, va, vb);
                             iLeft++;
@@ -982,7 +817,7 @@ class Voronoi {
                             // fall through
 
                             // walk rightward along bottom side
-                            lastBorderSegment = this.equalWithEpsilon(vz.y, yb);
+                            lastBorderSegment = this.eqEps(vz.y, yb);
                             vb = this.createVertex(lastBorderSegment ? vz.x : xr, yb);
                             edge = this.createBorderEdge(cell.site, va, vb);
                             iLeft++;
@@ -995,7 +830,7 @@ class Voronoi {
                             // fall through
 
                             // walk upward along right side
-                            lastBorderSegment = this.equalWithEpsilon(vz.x, xr);
+                            lastBorderSegment = this.eqEps(vz.x, xr);
                             vb = this.createVertex(xr, lastBorderSegment ? vz.y : yt);
                             edge = this.createBorderEdge(cell.site, va, vb);
                             iLeft++;
