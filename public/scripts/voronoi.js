@@ -115,8 +115,6 @@ class Voronoi {
         this.firstCircleEvent = null;
     }
 
-    // utility functions for floating point stuff
-
     eqEps(a, b) {
         return Math.abs(a - b) < 1e-9;
     }
@@ -130,7 +128,6 @@ class Voronoi {
         return b - a > 1e-9;
     }
 
-    // resets internal state
     reset() {
         this.beachline = new RedBlackTree();
         this.circleEvents = new RedBlackTree();
@@ -189,7 +186,7 @@ class Voronoi {
         // fallback: if no right neighbor exists
         return arc.site.y === sweepLineY ? arc.site.x : Infinity;
     }
-    
+
     detachBeachsection(beachsection) {
         this.detachCircleEvent(beachsection); // detach potentially attached circle event
         this.beachline.Remove(beachsection); // remove from RB-tree
@@ -683,96 +680,168 @@ class Voronoi {
             cell.closeMe = false;
         }
     }
-
+    //
+    // compute(sites, bbox) {
+    //     // to measure execution time
+    //     var startTime = new Date();
+    //
+    //     // init internal state
+    //     this.reset();
+    //
+    //     // Initialize site event queue
+    //     var siteEvents = sites.slice(0);
+    //     siteEvents.sort(function (a, b) {
+    //         var r = b.y - a.y;
+    //         if (r) {
+    //             return r;
+    //         }
+    //         return b.x - a.x;
+    //     });
+    //
+    //     // process queue
+    //     var site = siteEvents.pop(),
+    //         siteid = 0,
+    //         xsitex, // to avoid duplicate sites
+    //         xsitey,
+    //         cells = this.cells,
+    //         circle;
+    //
+    //     let step_i = -1;
+    //
+    //     // main loop
+    //     for (; ;) {
+    //         step_i++;
+    //         // we need to figure whether we handle a site or circle event
+    //         // for this we find out if there is a site event and it is
+    //         // 'earlier' than the circle event
+    //         circle = this.firstCircleEvent;
+    //
+    //         // add beach section
+    //         if (site && (!circle || site.y < circle.y || (site.y === circle.y && site.x < circle.x))) {
+    //             // only if site is not a duplicate
+    //             if (site.x !== xsitex || site.y !== xsitey) {
+    //                 // first create cell for new site
+    //                 cells[siteid] = new Cell(site);
+    //                 site.voronoiId = siteid++;
+    //                 // then create a beachsection for that site
+    //                 this.addBeachsection(site);
+    //                 // remember last site coords to detect duplicate
+    //                 xsitey = site.y;
+    //                 xsitex = site.x;
+    //             }
+    //             site = siteEvents.pop();
+    //         }
+    //
+    //         // remove beach section
+    //         else if (circle) {
+    //             this.removeBeachsection(circle.arc);
+    //         }
+    //
+    //         // all done, quit
+    //         else {
+    //             break;
+    //         }
+    //     }
+    //
+    //     // wrapping-up:
+    //     //   connect dangling edges to bounding box
+    //     //   cut edges as per bounding box
+    //     //   discard edges completely outside bounding box
+    //     //   discard edges which are point-like
+    //     this.clipEdges(bbox);
+    //
+    //     //   add missing edges in order to close opened cells
+    //     this.closeCells(bbox);
+    //
+    //     // to measure execution time
+    //     var stopTime = new Date();
+    //
+    //     // prepare return values
+    //     var diagram = new Diagram();
+    //     diagram.cells = this.cells;
+    //     diagram.edges = this.edges;
+    //     diagram.vertices = this.vertices;
+    //     diagram.execTime = stopTime.getTime() - startTime.getTime();
+    //     diagram.i = step_i;
+    //
+    //     // clean up
+    //     this.reset();
+    //
+    //     return diagram;
+    // }
 
     compute(sites, bbox) {
-        // to measure execution time
-        var startTime = new Date();
-
-        // init internal state
+        // reset internal state
         this.reset();
 
-        // Initialize site event queue
-        var siteEvents = sites.slice(0);
-        siteEvents.sort(function (a, b) {
-            var r = b.y - a.y;
-            if (r) {
-                return r;
-            }
-            return b.x - a.x;
+        // initialize site event queue (sorted top-to-bottom, left-to-right)
+        const siteEvents = sites.slice(0);
+        siteEvents.sort((a, b) => {
+            const diffY = b.y - a.y; // sort by descending y-coordinate
+            return diffY || (b.x - a.x); // tie-breaker: descending x-coordinate
         });
 
-        // process queue
-        var site = siteEvents.pop(),
-            siteid = 0,
-            xsitex, // to avoid duplicate sites
-            xsitey,
-            cells = this.cells,
-            circle;
+        let site = siteEvents.pop(); // get the first site (bottom-most)
+        let siteid = 0; // unique id for each site
+        let xsitex, xsitey; // to track duplicate site coordinates
+        let cells = this.cells; // store cells created for each site
+        let step_i = -1; // iteration step count for debugging/tracking
 
-        let step_i = -1;
-
-        // main loop
+        // process site and circle events
         for (; ;) {
             step_i++;
-            // we need to figure whether we handle a site or circle event
-            // for this we find out if there is a site event and it is
-            // 'earlier' than the circle event
-            circle = this.firstCircleEvent;
 
-            // add beach section
+            // get the first circle event (smallest in the queue)
+            let circle = this.firstCircleEvent;
+
+            // process site event (if it's earlier than the circle event)
             if (site && (!circle || site.y < circle.y || (site.y === circle.y && site.x < circle.x))) {
-                // only if site is not a duplicate
+                // add a beach section only if the site is not a duplicate
                 if (site.x !== xsitex || site.y !== xsitey) {
-                    // first create cell for new site
+                    // create a cell for the new site
                     cells[siteid] = new Cell(site);
                     site.voronoiId = siteid++;
-                    // then create a beachsection for that site
+
+                    // create a beach section for the site
                     this.addBeachsection(site);
-                    // remember last site coords to detect duplicate
+
+                    // update last site coordinates to detect duplicates
                     xsitey = site.y;
                     xsitex = site.x;
                 }
+
+                // move to the next site in the queue
                 site = siteEvents.pop();
-            }
-
-            // remove beach section
-            else if (circle) {
+            } else if (circle) { // process circle event (remove collapsing beach section)
                 this.removeBeachsection(circle.arc);
-            }
-
-            // all done, quit
-            else {
+            } else { // no more events to process
                 break;
             }
         }
 
-        // wrapping-up:
-        //   connect dangling edges to bounding box
-        //   cut edges as per bounding box
-        //   discard edges completely outside bounding box
-        //   discard edges which are point-like
+        // post-processing:
+        // 1. connect dangling edges to the bounding box
+        // 2. clip edges to fit within the bounding box
+        // 3. discard edges completely outside the bounding box
+        // 4. remove edges that are reduced to points
         this.clipEdges(bbox);
 
-        //   add missing edges in order to close opened cells
+        // close open cells by adding missing edges
         this.closeCells(bbox);
 
-        // to measure execution time
-        var stopTime = new Date();
-
-        // prepare return values
-        var diagram = new Diagram();
+        // create and populate the result diagram
+        const diagram = new Diagram();
         diagram.cells = this.cells;
         diagram.edges = this.edges;
         diagram.vertices = this.vertices;
-        diagram.execTime = stopTime.getTime() - startTime.getTime();
         diagram.i = step_i;
 
-        // clean up
+        // clean up internal state
         this.reset();
 
-        return diagram;
+        return diagram; // return the final Voronoi diagram
     }
+
 
     computeStepByStep(sites, bbox, step) {
         // init internal state
