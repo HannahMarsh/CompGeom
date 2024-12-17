@@ -1,51 +1,38 @@
 class Cell {
     constructor(site) {
-        this.site = site;
-        this.halfedges = [];
+        this.site = site; // voronoi site
+        this.halfedges = []; // cell boundary
     }
 
-    init(site) {
-        this.site = site;
-        this.halfedges = [];
-        return this;
-    }
-
+    // removes halfedges and sorts them counterclockwise
     prepareHalfedges() {
-        var halfedges = this.halfedges,
-            iHalfedge = halfedges.length,
-            edge;
-        
+        let iHalfedge = this.halfedges.length;
+
         while (iHalfedge--) {
-            edge = halfedges[iHalfedge].edge;
-            if (!edge.vb || !edge.va) {
-                halfedges.splice(iHalfedge,1);
+            const edge = this.halfedges[iHalfedge].edge;
+            if (!edge.va || !edge.vb) {
+                this.halfedges.splice(iHalfedge, 1);
             }
         }
-        halfedges.sort(function(a,b){return b.angle-a.angle;});
-        return halfedges.length;
+
+        this.halfedges.sort((a, b) => b.angle - a.angle); // sort counterclockwise
+        return this.halfedges.length;
     }
 }
 
 class Halfedge {
     constructor(edge, lSite, rSite) {
-        this.site = lSite;
+        this.site = lSite; // site to the left
         this.edge = edge;
-        // 'angle' is a value to be used for properly sorting the
-        // halfsegments counterclockwise. By convention, we will
-        // use the angle of the line defined by the 'site to the left'
-        // to the 'site to the right'.
-        // However, border edges have no 'site to the right': thus we
-        // use the angle of line perpendicular to the halfsegment (the
-        // edge should have both end points defined in such case.)
+
+        // calculate angle to sort by; use perpendicular line if no rSite
         if (rSite) {
-            this.angle = Math.atan2(rSite.y-lSite.y, rSite.x-lSite.x);
-        }
-        else {
-            var va = edge.va,
-                vb = edge.vb;
-            this.angle = edge.lSite === lSite ?
-                Math.atan2(vb.x-va.x, va.y-vb.y) :
-                Math.atan2(va.x-vb.x, vb.y-va.y);
+            this.angle = Math.atan2(rSite.y - lSite.y, rSite.x - lSite.x);
+        } else {
+            const { va, vb } = edge;
+            this.angle = edge.lSite === lSite
+                ? Math.atan2(vb.x - va.x, va.y - vb.y)
+                : Math.atan2(va.x - vb.x, vb.y - va.y);
         }
     }
 
@@ -59,10 +46,27 @@ class Halfedge {
 }
 
 class Edge {
-    constructor(lSite, rSite) {
+    constructor(lSite, rSite, va = null, vb = null) {
         this.lSite = lSite;
         this.rSite = rSite;
-        this.va = this.vb = null;
+        this.va = va; // starting vertex
+        this.vb = vb; // ending vertex
+    }
+
+    setEdgeStartpoint(lSite, rSite, vertex) {
+        if (!this.va && !this.vb) {
+            this.va = vertex;
+            this.lSite = lSite;
+            this.rSite = rSite;
+        } else if (this.lSite === rSite) {
+            this.vb = vertex;
+        } else {
+            this.va = vertex;
+        }
+    }
+
+    setEdgeEndpoint(lSite, rSite, vertex) {
+        this.setEdgeStartpoint(rSite, lSite, vertex);
     }
 
 }
@@ -88,14 +92,11 @@ class Beachsection {
 
 class CircleEvent {
     constructor() {
-        // it helps to state exactly what we are at ctor time.
         this.arc = null;
-        this.rbLeft = null;
-        this.rbNext = null;
+        this.rbLeft = this.rbRight = null;
+        this.rbPrevious = this.rbNext = null;
         this.rbParent = null;
-        this.rbPrevious = null;
         this.rbRed = false;
-        this.rbRight = null;
         this.site = null;
     }
 
@@ -104,47 +105,37 @@ class CircleEvent {
 class Voronoi {
 
     constructor() {
+        // initialization of main structures
         this.vertices = [];
         this.edges = [];
         this.cells = [];
+
+        // BBST for beachline and circle events
         this.beachline = new RedBlackTree();
         this.circleEvents = new RedBlackTree();
         this.firstCircleEvent = null;
-        this.sqrt = Math.sqrt;
-        this.abs = Math.abs;
-        this.equalWithEpsilon = function (a, b) {
-            return this.abs(a - b) < 1e-9;
-        };
-        this.greaterThanWithEpsilon = function (a, b) {
-            return a - b > 1e-9;
-        };
-        this.lessThanWithEpsilon = function (a, b) {
-            return b - a > 1e-9;
-        };
     }
 
+    // utility functions for floating point stuff
+
+    equalWithEpsilon(a, b) {
+        return Math.abs(a - b) < 1e-9;
+    }
+    greaterThanWithEpsilon(a, b) {
+        return a - b > 1e-9;
+    }
+    lessThanWithEpsilon(a, b) {
+        return b - a > 1e-9;
+    }
+
+    // resets internal state
     reset() {
-        if (!this.beachline) {
-            this.beachline = new RedBlackTree();
-        }
-        if (this.beachline.root) {
-            let beachSection = this.beachline.getLeftmost(this.beachline.root);
-            while (beachSection) {
-                beachSection = beachSection.rbNext;
-            }
-        }
-        this.beachline.root = null;
-        if (!this.circleEvents) {
-            this.circleEvents = new RedBlackTree();
-        }
-        this.circleEvents.root = this.firstCircleEvent = null;
+        this.beachline = new RedBlackTree();
+        this.circleEvents = new RedBlackTree();
+        this.firstCircleEvent = null;
         this.vertices = [];
         this.edges = [];
         this.cells = [];
-    }
-
-    createHalfedge(edge, lSite, rSite) {
-        return new Halfedge(edge, lSite, rSite);
     }
 
     createVertex(x, y) {
@@ -153,56 +144,24 @@ class Voronoi {
         return v;
     }
 
-    createCell(site) {
-        return new Cell(site);
-    }
-
-    // this create and add an edge to internal collection, and also create
-    // two halfedges which are added to each site's counterclockwise array
-    // of halfedges.
-
     createEdge(lSite, rSite, va, vb) {
-        const edge = new Edge(lSite, rSite);
-
+        const edge = new Edge(lSite, rSite, null, null);
         this.edges.push(edge);
-        if (va) {
-            this.setEdgeStartpoint(edge, lSite, rSite, va);
-        }
-        if (vb) {
-            this.setEdgeEndpoint(edge, lSite, rSite, vb);
-        }
-        this.cells[lSite.voronoiId].halfedges.push(this.createHalfedge(edge, lSite, rSite));
-        this.cells[rSite.voronoiId].halfedges.push(this.createHalfedge(edge, rSite, lSite));
+        
+        if (va) edge.setEdgeStartpoint(lSite, rSite, va);
+        if (vb) edge.setEdgeEndpoint(lSite, rSite, vb);
+
+        // create halfedges for the left and right sites
+        this.cells[lSite.voronoiId].halfedges.push(new Halfedge(edge, lSite, rSite));
+        this.cells[rSite.voronoiId].halfedges.push(new Halfedge(edge, rSite, lSite));
         return edge;
     }
 
     createBorderEdge(lSite, va, vb) {
-        var edge = new Edge(lSite, null);
-        edge.va = va;
-        edge.vb = vb;
+        const edge = new Edge(lSite, null, va, vb);
         this.edges.push(edge);
         return edge;
     }
-
-    setEdgeStartpoint(edge, lSite, rSite, vertex) {
-        if (!edge.va && !edge.vb) {
-            edge.va = vertex;
-            edge.lSite = lSite;
-            edge.rSite = rSite;
-        } else if (edge.lSite === rSite) {
-            edge.vb = vertex;
-        } else {
-            edge.va = vertex;
-        }
-    }
-
-    setEdgeEndpoint(edge, lSite, rSite, vertex) {
-        this.setEdgeStartpoint(edge, rSite, lSite, vertex);
-    }
-
-    createBeachsection(site) {
-        return new Beachsection(site);
-    };
 
     leftBreakPoint(arc, directrix) {
         // http://en.wikipedia.org/wiki/Parabola
@@ -263,7 +222,7 @@ class Voronoi {
             aby2 = 1 / pby2 - 1 / plby2,
             b = hl / plby2;
         if (aby2) {
-            return (-b + this.sqrt(b * b - 2 * aby2 * (hl * hl / (-2 * plby2) - lfocy + plby2 / 2 + rfocy - pby2 / 2))) / aby2 + rfocx;
+            return (-b + Math.sqrt(b * b - 2 * aby2 * (hl * hl / (-2 * plby2) - lfocy + plby2 / 2 + rfocy - pby2 / 2))) / aby2 + rfocx;
         }
         // both parabolas have same distance to directrix, thus break point is midway
         return (rfocx + lfocx) / 2;
@@ -345,7 +304,7 @@ class Voronoi {
         for (iArc = 1; iArc < nArcs; iArc++) {
             rArc = disappearingTransitions[iArc];
             lArc = disappearingTransitions[iArc - 1];
-            this.setEdgeStartpoint(rArc.edge, lArc.site, rArc.site, vertex);
+            rArc.edge.setEdgeStartpoint(lArc.site, rArc.site, vertex);
         }
 
         // create a new edge as we have now a new transition between
@@ -417,7 +376,7 @@ class Voronoi {
         // undefined or null.
 
         // create a new beach section object for the site and add it to RB-tree
-        var newArc = this.createBeachsection(site);
+        var newArc = new Beachsection(site);
         this.beachline.Insert(lArc, newArc);
 
         // cases:
@@ -446,7 +405,7 @@ class Voronoi {
             this.detachCircleEvent(lArc);
 
             // split the beach section into two separate beach sections
-            rArc = this.createBeachsection(lArc.site);
+            rArc = new Beachsection(lArc.site);
             this.beachline.Insert(newArc, rArc);
 
             // since we have a new transition between two beach sections,
@@ -592,7 +551,7 @@ class Voronoi {
         circleEvent.arc = arc;
         circleEvent.site = cSite;
         circleEvent.x = x + bx;
-        circleEvent.y = ycenter + this.sqrt(x * x + y * y); // y bottom
+        circleEvent.y = ycenter + Math.sqrt(x * x + y * y); // y bottom
         circleEvent.ycenter = ycenter;
         arc.circleEvent = circleEvent;
 
@@ -959,7 +918,7 @@ class Voronoi {
                             vb = this.createVertex(xl, lastBorderSegment ? vz.y : yb);
                             edge = this.createBorderEdge(cell.site, va, vb);
                             iLeft++;
-                            halfedges.splice(iLeft, 0, this.createHalfedge(edge, cell.site, null));
+                            halfedges.splice(iLeft, 0, new Halfedge(edge, cell.site, null));
                             nHalfedges++;
                             if (lastBorderSegment) {
                                 break;
@@ -973,7 +932,7 @@ class Voronoi {
                             vb = this.createVertex(lastBorderSegment ? vz.x : xr, yb);
                             edge = this.createBorderEdge(cell.site, va, vb);
                             iLeft++;
-                            halfedges.splice(iLeft, 0, this.createHalfedge(edge, cell.site, null));
+                            halfedges.splice(iLeft, 0, new Halfedge(edge, cell.site, null));
                             nHalfedges++;
                             if (lastBorderSegment) {
                                 break;
@@ -987,7 +946,7 @@ class Voronoi {
                             vb = this.createVertex(xr, lastBorderSegment ? vz.y : yt);
                             edge = this.createBorderEdge(cell.site, va, vb);
                             iLeft++;
-                            halfedges.splice(iLeft, 0, this.createHalfedge(edge, cell.site, null));
+                            halfedges.splice(iLeft, 0, new Halfedge(edge, cell.site, null));
                             nHalfedges++;
                             if (lastBorderSegment) {
                                 break;
@@ -1001,7 +960,7 @@ class Voronoi {
                             vb = this.createVertex(lastBorderSegment ? vz.x : xl, yt);
                             edge = this.createBorderEdge(cell.site, va, vb);
                             iLeft++;
-                            halfedges.splice(iLeft, 0, this.createHalfedge(edge, cell.site, null));
+                            halfedges.splice(iLeft, 0, new Halfedge(edge, cell.site, null));
                             nHalfedges++;
                             if (lastBorderSegment) {
                                 break;
@@ -1014,7 +973,7 @@ class Voronoi {
                             vb = this.createVertex(xl, lastBorderSegment ? vz.y : yb);
                             edge = this.createBorderEdge(cell.site, va, vb);
                             iLeft++;
-                            halfedges.splice(iLeft, 0, this.createHalfedge(edge, cell.site, null));
+                            halfedges.splice(iLeft, 0, new Halfedge(edge, cell.site, null));
                             nHalfedges++;
                             if (lastBorderSegment) {
                                 break;
@@ -1027,7 +986,7 @@ class Voronoi {
                             vb = this.createVertex(lastBorderSegment ? vz.x : xr, yb);
                             edge = this.createBorderEdge(cell.site, va, vb);
                             iLeft++;
-                            halfedges.splice(iLeft, 0, this.createHalfedge(edge, cell.site, null));
+                            halfedges.splice(iLeft, 0, new Halfedge(edge, cell.site, null));
                             nHalfedges++;
                             if (lastBorderSegment) {
                                 break;
@@ -1040,7 +999,7 @@ class Voronoi {
                             vb = this.createVertex(xr, lastBorderSegment ? vz.y : yt);
                             edge = this.createBorderEdge(cell.site, va, vb);
                             iLeft++;
-                            halfedges.splice(iLeft, 0, this.createHalfedge(edge, cell.site, null));
+                            halfedges.splice(iLeft, 0, new Halfedge(edge, cell.site, null));
                             nHalfedges++;
                             if (lastBorderSegment) {
                                 break;
@@ -1097,7 +1056,7 @@ class Voronoi {
                 // only if site is not a duplicate
                 if (site.x !== xsitex || site.y !== xsitey) {
                     // first create cell for new site
-                    cells[siteid] = this.createCell(site);
+                    cells[siteid] = new Cell(site);
                     site.voronoiId = siteid++;
                     // then create a beachsection for that site
                     this.addBeachsection(site);
@@ -1182,7 +1141,7 @@ class Voronoi {
                 // only if site is not a duplicate
                 if (site.x !== xsitex || site.y !== xsitey) {
                     // first create cell for new site
-                    cells[siteid] = this.createCell(site);
+                    cells[siteid] = new Cell(site);
                     site.voronoiId = siteid++;
                     // then create a beachsection for that site
                     this.addBeachsection(site);
@@ -1263,16 +1222,6 @@ class Voronoi {
             event = event.rbNext;
         }
         return circleEvents;
-    }
-
-    getBeachline() {
-        const beachline = [];
-        let section = this.beachline?.getLeftmost(this.beachline?.root);
-        while (section) {
-            beachline.push(section);
-            section = section.rbNext;
-        }
-        return beachline;
     }
 
 }
