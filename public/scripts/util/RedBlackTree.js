@@ -1,9 +1,9 @@
-class RBTree {
+class RedBlackTree {
     constructor() {
         this.root = null;
     }
 
-    rbInsertSuccessor(node, successor) {
+    Insert(node, successor) {
         let parent;
         if (node) {
             successor.rbPrevious = node;
@@ -14,7 +14,6 @@ class RBTree {
             node.rbNext = successor;
 
             if (node.rbRight) {
-                // in-place expansion of node.rbRight.getFirst();
                 node = node.rbRight;
                 while (node.rbLeft) {node = node.rbLeft;}
                 node.rbLeft = successor;
@@ -24,14 +23,11 @@ class RBTree {
             }
             parent = node;
         }
-        // if node is null, successor must be inserted to the left-most part of the tree
         else if (this.root) {
-            node = this.getFirst(this.root);
-            // >>> Performance: cache previous/next nodes
+            node = this.getLeftmost(this.root);
             successor.rbPrevious = null;
             successor.rbNext = node;
             node.rbPrevious = successor;
-            // <<<
             node.rbLeft = successor;
             parent = node;
         }
@@ -56,13 +52,13 @@ class RBTree {
                 }
                 else {
                     if (node === parent.rbRight) {
-                        this.rbRotateLeft(parent);
+                        this.rotateLeft(parent);
                         node = parent;
                         parent = node.rbParent;
                     }
                     parent.rbRed = false;
                     grandpa.rbRed = true;
-                    this.rbRotateRight(grandpa);
+                    this.rotateRight(grandpa);
                 }
             }
             else {
@@ -74,13 +70,13 @@ class RBTree {
                 }
                 else {
                     if (node === parent.rbLeft) {
-                        this.rbRotateRight(parent);
+                        this.rotateRight(parent);
                         node = parent;
                         parent = node.rbParent;
                     }
                     parent.rbRed = false;
                     grandpa.rbRed = true;
-                    this.rbRotateLeft(grandpa);
+                    this.rotateLeft(grandpa);
                 }
             }
             parent = node.rbParent;
@@ -88,7 +84,7 @@ class RBTree {
         this.root.rbRed = false;
     }
 
-    rbRemoveNode(node) {
+    Remove(node) {
         if (node.rbNext) {
             node.rbNext.rbPrevious = node.rbPrevious;
         }
@@ -108,7 +104,7 @@ class RBTree {
             next = left;
         }
         else {
-            next = this.getFirst(right);
+            next = this.getLeftmost(right);
         }
         if (parent) {
             if (parent.rbLeft === node) {
@@ -121,7 +117,6 @@ class RBTree {
         else {
             this.root = next;
         }
-        // enforce red-black rules
         let isRed;
         if (left && right) {
             isRed = next.rbRed;
@@ -146,18 +141,14 @@ class RBTree {
             isRed = node.rbRed;
             node = next;
         }
-        // 'node' is now the sole successor's child and 'parent' its
-        // new parent (since the successor can have been moved)
         if (node) {
             node.rbParent = parent;
         }
-        // the 'easy' cases
         if (isRed) {return;}
         if (node && node.rbRed) {
             node.rbRed = false;
             return;
         }
-        // the other cases
         var sibling;
         do {
             if (node === this.root) {
@@ -168,19 +159,19 @@ class RBTree {
                 if (sibling.rbRed) {
                     sibling.rbRed = false;
                     parent.rbRed = true;
-                    this.rbRotateLeft(parent);
+                    this.rotateLeft(parent);
                     sibling = parent.rbRight;
                 }
                 if ((sibling.rbLeft && sibling.rbLeft.rbRed) || (sibling.rbRight && sibling.rbRight.rbRed)) {
                     if (!sibling.rbRight || !sibling.rbRight.rbRed) {
                         sibling.rbLeft.rbRed = false;
                         sibling.rbRed = true;
-                        this.rbRotateRight(sibling);
+                        this.rotateRight(sibling);
                         sibling = parent.rbRight;
                     }
                     sibling.rbRed = parent.rbRed;
                     parent.rbRed = sibling.rbRight.rbRed = false;
-                    this.rbRotateLeft(parent);
+                    this.rotateLeft(parent);
                     node = this.root;
                     break;
                 }
@@ -190,19 +181,19 @@ class RBTree {
                 if (sibling.rbRed) {
                     sibling.rbRed = false;
                     parent.rbRed = true;
-                    this.rbRotateRight(parent);
+                    this.rotateRight(parent);
                     sibling = parent.rbLeft;
                 }
                 if ((sibling.rbLeft && sibling.rbLeft.rbRed) || (sibling.rbRight && sibling.rbRight.rbRed)) {
                     if (!sibling.rbLeft || !sibling.rbLeft.rbRed) {
                         sibling.rbRight.rbRed = false;
                         sibling.rbRed = true;
-                        this.rbRotateLeft(sibling);
+                        this.rotateLeft(sibling);
                         sibling = parent.rbLeft;
                     }
                     sibling.rbRed = parent.rbRed;
                     parent.rbRed = sibling.rbLeft.rbRed = false;
-                    this.rbRotateRight(parent);
+                    this.rotateRight(parent);
                     node = this.root;
                     break;
                 }
@@ -214,9 +205,9 @@ class RBTree {
         if (node) {node.rbRed = false;}
     }
 
-    rbRotateLeft(node) {
+    rotateLeft(node) {
         var p = node,
-            q = node.rbRight, // can't be null
+            q = node.rbRight,
             parent = p.rbParent;
         if (parent) {
             if (parent.rbLeft === p) {
@@ -238,9 +229,9 @@ class RBTree {
         q.rbLeft = p;
     }
 
-    rbRotateRight(node) {
+    rotateRight(node) {
         var p = node,
-            q = node.rbLeft, // can't be null
+            q = node.rbLeft,
             parent = p.rbParent;
         if (parent) {
             if (parent.rbLeft === p) {
@@ -262,7 +253,7 @@ class RBTree {
         q.rbRight = p;
     }
 
-    getFirst(node) {
+    getLeftmost(node) {
         if (!node) {return null;}
         while (node.rbLeft) {
             node = node.rbLeft;
@@ -272,5 +263,5 @@ class RBTree {
 }
 
 if ( typeof module !== 'undefined' ) {
-    module.exports = RBTree;
+    module.exports = RedBlackTree;
 }
