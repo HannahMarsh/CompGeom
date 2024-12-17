@@ -256,7 +256,7 @@ document.getElementById("add-random-button").addEventListener("click", () => {
 // let started = false;
 
 document.getElementById("visualize-fortune-button").addEventListener("click", () => {
-    if (canvasWrapper.IsEndOfAlgorithm()) {
+    if (!canvasWrapper.IsInAlgorithm()) {
         console.log("Algorithm started");
         document.getElementById("visualize-fortune-button").innerText = "Exit";
         enableButton("next-button");
@@ -264,6 +264,7 @@ document.getElementById("visualize-fortune-button").addEventListener("click", ()
         isPaused = true;
         document.getElementById("pause-button").innerText = "Auto-play";
         enableButton("pause-button");
+        canvasWrapper.ToggleInAlgorithm();
         canvasWrapper.NextTransition();
     } else {
         console.log("Algorithm stopped");
@@ -273,7 +274,7 @@ document.getElementById("visualize-fortune-button").addEventListener("click", ()
         document.getElementById("pause-button").innerText = "Auto-play";
         disableButton("pause-button");
         isPaused = true;
-        canvasWrapper.ExitAlgorithm();
+        canvasWrapper.ToggleInAlgorithm();
     }
 });
 

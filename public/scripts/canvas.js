@@ -11,15 +11,30 @@ class Canvas {
     this.ctx = this.canvas.getContext("2d");
     this.voronoi = new Voronoi();
     this.results = [];
+    this.steps = [];
+    this.finalResult = null;
     this.points = [];
-    this.step = 0;
+    this.step = -1;
+    this.numSteps = 0;
+    this.inAlgorithm = false;
     this.showBeachline = true;
     this.showCircles = true;
     this.smoothTransitions = true;
     this.animationSpeed = 100;
     this.interruptedAnimation = false;
-    this.initialized = false;
-    this.circleEvents = [];
+  }
+
+  eqEps(a, b) {
+    return Math.abs(a - b) < 1e-9;
+  }
+  neqEps(a, b) {
+    return !this.eqEps(a, b);
+  }
+  gtEps(a, b) {
+    return a - b > 1e-9;
+  }
+  ltEps(a, b) {
+    return b - a > 1e-9;
   }
 
   Width() {
@@ -66,7 +81,8 @@ class Canvas {
 
   ClearAllPoints() {
     this.points.length = 0;
-    this.initialized = false;
+    this.inAlgorithm = false;
+    this.step = -1;
     this.ComputeVoronoi()
     this.DrawCurrentState();
   }
@@ -134,150 +150,175 @@ class Canvas {
 
   ComputeVoronoi() {
     this.results.length = 0;
-    this.circleEvents.length = 0;
+    this.finalResult = null;
+    this.numSteps = 0;
     if (this.points.length > 1) {
       console.log("Computing Voronoi diagram.")
-      let finalResult = this.voronoi.compute(this.points, this.bbox);
 
-      let yValues = this.points.map(point => {
-        return point.y;
+
+      this.results = this.voronoi.compute2(this.points, this.bbox);
+      this.steps = this.results.flatMap(result => result.steps);
+      this.steps.sort((a, b) => a.step - b.step);
+      this.numSteps = Math.max(...this.steps.map(step => step.step)) + 1;
+      this.steps.unshift({
+        step: -1,
+        sweepLine: Math.min(this.bbox.yt, this.bbox.yb),
+        circleEvents: [],
+        edges: [],
+      });
+      this.steps.push({
+        step: this.numSteps,
+        sweepLine: Math.max(this.bbox.yt, this.bbox.yb),
+        circleEvents: [],
+        edges: this.steps[this.steps.length - 1].edges,
       });
 
+      this.finalResult = this.steps[this.steps.length - 1];
 
-      yValues.sort((a, b) => {
-        return a - b;
-      });
+      //
+      // let finalResult = this.voronoi.compute(this.points, this.bbox);
+      //
+      // let yValues = this.points.map(point => {
+      //   return point.y;
+      // });
+      //
+      //
+      // yValues.sort((a, b) => {
+      //   return a - b;
+      // });
+      //
+      // let steps = yValues.map(y => {
+      //   return {
+      //     y: y,
+      //     step1: 0,
+      //     step2: 0,
+      //     circleEvents: [],
+      //     edges: [],
+      //     numArcs: 0
+      //   }
+      // })
+      //
+      // let lastsweepLine = -1;
+      // for (let i = 0; i <= finalResult.i; i++) {
+      //   let result = this.voronoi.computeStepByStep(this.points, this.bbox, i);
+      //   let st = steps.find(step => {
+      //       return Math.abs(step.y - result.sweepLine) < 0.001;
+      //   });
+      //   if (!st) {
+      //     st = steps.find(step => {
+      //       return Math.abs(step.y - lastsweepLine) < 0.001;
+      //     });
+      //   }
+      //   if (st) {
+      //     st.numArcs = Math.max(st.numArcs, result.beachlineArcs?.length ?? 0);
+      //     result.circleEvents?.forEach(circleEvent => {
+      //       if (!st.circleEvents.find(ce => {
+      //         return ce.x === circleEvent.x && ce.y === circleEvent.y && ce.radius === circleEvent.radius;
+      //       })) {
+      //         st.circleEvents.push({
+      //           x: circleEvent.x,
+      //           y: circleEvent.y,
+      //           radius: circleEvent.radius
+      //         });
+      //       }
+      //     });
+      //     if (result.sweepLine !== lastsweepLine) {
+      //       let s = steps.find(step => {
+      //         return step.y === result.sweepLine;
+      //       });
+      //       if (s) {
+      //         s.step1 = i;
+      //       }
+      //       if (lastsweepLine !== -1) {
+      //         steps.find(step => {
+      //           return step.y === lastsweepLine;
+      //         }).step2 = i - 1;
+      //       }
+      //       lastsweepLine = result.sweepLine;
+      //     }
+      //   }
+      // }
+      //
+      // let maxY = Math.max(...yValues);
+      //   let st = steps.find(step => {
+      //     return Math.abs(step.y - maxY) < 0.001;
+      //   });
+      //   if (st) {
+      //     finalResult.edges.forEach(edge => {
+      //         st.edges.push({
+      //           va: {
+      //             x: edge.va.x,
+      //             y: edge.va.y
+      //           },
+      //           vb: {
+      //             x: edge.vb.x,
+      //             y: edge.vb.y
+      //           }
+      //         });
+      //     })
+      //   }
+      //
+      // lastsweepLine = -1;
+      // for (let i = finalResult.i - 1; i >= 0; i--) {
+      //   let result = this.voronoi.computeStepByStep(this.points, this.bbox, i);
+      //   if (result.sweepLine !== lastsweepLine) {
+      //     lastsweepLine = result.sweepLine;
+      //     if (result.sweepLine !== maxY) {
+      //       let st = steps.find(step => {
+      //         return Math.abs(step.y - result.sweepLine) < 0.001;
+      //       });
+      //       if (st) {
+      //         result.edges.forEach(edge => {
+      //           if (!st.edges.find(e => {
+      //             return this.Equals(e.va.x, edge.va.x) && this.Equals(e.va.y, edge.va.y) && this.Equals(e.vb.x, edge.vb.x) && this.Equals(e.vb.y, edge.vb.y);
+      //             //e.va.x === edge.va.x && e.va.y === edge.va.y && e.vb.x === edge.vb.x && e.vb.y === edge.vb.y;
+      //           })) {
+      //             st.edges.push({
+      //               va: {
+      //                 x: edge.va.x,
+      //                 y: edge.va.y
+      //               },
+      //               vb: {
+      //                 x: edge.vb.x,
+      //                 y: edge.vb.y
+      //               }
+      //             });
+      //           } else {
+      //             console.log("Edge already exists.")
+      //           }
+      //         })
+      //       }
+      //     }
+      //   }
+      // }
+      //
+      // this.results = steps;
 
-      let steps = yValues.map(y => {
-        return {
-          y: y,
-          step1: 0,
-          step2: 0,
-          circleEvents: [],
-          edges: [],
-          numArcs: 0
-        }
-      })
-
-      let lastsweepLine = -1;
-      for (let i = 0; i <= finalResult.i; i++) {
-        let result = this.voronoi.computeStepByStep(this.points, this.bbox, i);
-        let st = steps.find(step => {
-            return Math.abs(step.y - result.sweepLine) < 0.001;
-        });
-        if (!st) {
-          st = steps.find(step => {
-            return Math.abs(step.y - lastsweepLine) < 0.001;
-          });
-        }
-        if (st) {
-          st.numArcs = Math.max(st.numArcs, result.beachlineArcs?.length ?? 0);
-          result.circleEvents?.forEach(circleEvent => {
-            if (!st.circleEvents.find(ce => {
-              return ce.x === circleEvent.x && ce.y === circleEvent.y && ce.radius === circleEvent.radius;
-            })) {
-              st.circleEvents.push({
-                x: circleEvent.x,
-                y: circleEvent.y,
-                radius: circleEvent.radius
-              });
-            }
-          });
-          if (result.sweepLine !== lastsweepLine) {
-            let s = steps.find(step => {
-              return step.y === result.sweepLine;
-            });
-            if (s) {
-              s.step1 = i;
-            }
-            if (lastsweepLine !== -1) {
-              steps.find(step => {
-                return step.y === lastsweepLine;
-              }).step2 = i - 1;
-            }
-            lastsweepLine = result.sweepLine;
-          }
-        }
-      }
-
-      let maxY = Math.max(...yValues);
-        let st = steps.find(step => {
-          return Math.abs(step.y - maxY) < 0.001;
-        });
-        if (st) {
-          finalResult.edges.forEach(edge => {
-              st.edges.push({
-                va: {
-                  x: edge.va.x,
-                  y: edge.va.y
-                },
-                vb: {
-                  x: edge.vb.x,
-                  y: edge.vb.y
-                }
-              });
-          })
-        }
-
-      lastsweepLine = -1;
-      for (let i = finalResult.i - 1; i >= 0; i--) {
-        let result = this.voronoi.computeStepByStep(this.points, this.bbox, i);
-        if (result.sweepLine !== lastsweepLine) {
-          lastsweepLine = result.sweepLine;
-          if (result.sweepLine !== maxY) {
-            let st = steps.find(step => {
-              return Math.abs(step.y - result.sweepLine) < 0.001;
-            });
-            if (st) {
-              result.edges.forEach(edge => {
-                if (!st.edges.find(e => {
-                  return this.Equals(e.va.x, edge.va.x) && this.Equals(e.va.y, edge.va.y) && this.Equals(e.vb.x, edge.vb.x) && this.Equals(e.vb.y, edge.vb.y);
-                  //e.va.x === edge.va.x && e.va.y === edge.va.y && e.vb.x === edge.vb.x && e.vb.y === edge.vb.y;
-                })) {
-                  st.edges.push({
-                    va: {
-                      x: edge.va.x,
-                      y: edge.va.y
-                    },
-                    vb: {
-                      x: edge.vb.x,
-                      y: edge.vb.y
-                    }
-                  });
-                } else {
-                  console.log("Edge already exists.")
-                }
-              })
-            }
-          }
-        }
-      }
-
-      this.results = steps;
-
-      if (!this.initialized) {
-        this.step = this.results.length - 1; //finalResult.i;
-        this.UpdateStep();
-        this.initialized = true;
-      }
+      // if (!this.initialized) {
+      //   this.step = this.results.length - 1; //finalResult.i;
+      //   this.UpdateStep();
+      //   this.initialized = true;
+      // }
     } else {
       console.log("Not enough points to compute Voronoi diagram.");
     }
   }
 
-  GetFinalResult() {
-    if (this.results? this.results.length > 0 : false) {
-      return this.results[this.results.length - 1];
+  GetCurrentResult() {
+    if (this.inAlgorithm) {
+      return this.GetResultAtStep(this.step);
+    } else {
+      return this.finalResult;
     }
-    return null;
   }
 
-  GetCurrentResult() {
-    if (this.initialized && this.step < (this.results?.length ?? 0) ) {
-      return this.results[this.step];
-    } else {
-      return null;
+  GetResultAtStep(step) {
+    if (!this.inAlgorithm) {
+      return this.finalResult;
     }
+    return this.steps?.find(s => {
+        return s.step === step;
+    });
   }
 
   Equals(a, b) {
@@ -298,33 +339,49 @@ class Canvas {
     this.smoothTransitions = !this.smoothTransitions;
   }
 
+
+  IsInAlgorithm() {
+    return this.inAlgorithm;
+  }
+
+  GetSweepline() {
+    if (this.inAlgorithm) {
+      return this.GetCurrentResult()?.sweepLine ?? -1;
+    } else {
+      return -1;
+    }
+  }
+
+  ToggleInAlgorithm() {
+    this.inAlgorithm = !this.inAlgorithm;
+    this.step = -1;
+  }
+
   DrawPoints() {
-    if (!this.initialized || (this.points?.length ?? 0) === 1) {
+    if ((this.points?.length ?? 0) <= 1) {
       this.points.forEach(point => {
         this.DrawPoint(point)
       });
-      return true;
+      return;
     }
-    let drewPoints = false;
-    let sweepLine = this.GetCurrentResult()?.y ?? Math.max(this.bbox.yb, this.bbox.yt);
-    let inAlg = this.step < this.results.length;
 
-    if ((this.points?.length ?? 0) > 1) {
-      this.points.forEach(point => {
-        drewPoints = true;
-        if (inAlg) {
-          this.DrawPoint(point, "black", point.y > sweepLine ? "white" : point.y < sweepLine ? "blue" : "red");
-        } else {
-            this.DrawPoint(point);
-        }
-      });
-    }
-    return drewPoints;
+    let sweepLine = this.GetSweepline();
+
+    this.points.forEach(point => {
+      if (this.inAlgorithm) {
+        this.DrawPoint(point, "black", point.y > sweepLine ? "white" : point.y < sweepLine ? "blue" : "red");
+      } else {
+        this.DrawPoint(point);
+      }
+    });
   }
 
   DrawEdge(edge) {
-    let isFinalEdge = this.GetFinalResult()?.edges?.find(e => {
-      return e.va.x === edge.va.x && e.va.y === edge.va.y && e.vb.x === edge.vb.x && e.vb.y === edge.vb.y;
+    if (!edge || !edge.va || !edge.vb) {
+      return;
+    }
+    let isFinalEdge = this.finalResult?.edges?.find(e => {
+      return this.eqEps(e.va.x, edge.va.x) && this.eqEps(e.va.y, edge.va.y) && this.eqEps(e.vb.x, edge.vb.x) && this.eqEps(e.vb.y, edge.vb.y);
     }) ?? false
 
     this.ctx.beginPath();
@@ -339,12 +396,9 @@ class Canvas {
     if (step === -1) {
       step = this.step;
     }
-    let drewEdge = false;
-    this.results[step]?.edges?.forEach(edge => {
+    this.GetResultAtStep(step)?.edges?.forEach(edge => {
       this.DrawEdge(edge)
-      drewEdge = true;
     });
-    return drewEdge;
   }
 
   DrawHorizontalLine(y, color) {
@@ -375,127 +429,85 @@ class Canvas {
   }
 
   DrawSweepLine() {
-    let drewSweepLine = false;
-    if (this.GetCurrentResult()) {
-      this.DrawHorizontalLine(this.GetCurrentResult()?.y, "red");
-      return true;
-    }
-    return false;
-  }
-
-  DrawBeachLines2(sweepLine = -1, color = "blue") {
-    if (sweepLine === -1) {
-        sweepLine = this.GetCurrentResult()?.y ?? -1;
-    }
-    if (this.showBeachline && sweepLine !== -1 && this.step < this.results.length - 1) {
-      let sites = this.points.filter(point => point.y < sweepLine);
-      let left = Math.min(this.bbox.xl, this.bbox.xr);
-      let right = Math.max(this.bbox.xl, this.bbox.xr);
-      let step = (Math.abs(left - right)) / 1000;
-      let first = false;
-
-      this.ctx.beginPath();
-
-      for (let x = left; x <= right; x += step) {
-        let y = Math.max(...sites.map(site => {
-          let h = site.x;
-          let k = site.y;
-          let d = sweepLine;
-          return ((x - h) ** 2) / (2 * (k - d)) + (k + d) / 2;
-        }))
-
-
-        if (y < Math.max(this.bbox.yt, this.bbox.yb) && y > Math.min(this.bbox.yt, this.bbox.yb)) {
-          if (first) {
-            this.ctx.lineTo(x, y);
-          } else {
-            first = true;
-          }
-          this.ctx.moveTo(x, y);
-          this.ctx.strokeStyle = color;
-          this.ctx.lineWidth = 2;
-          this.ctx.stroke();
-        }
-
-      }
+    if (this.inAlgorithm) {
+      this.DrawHorizontalLine(this.GetCurrentResult()?.sweepLine, "red");
     }
   }
 
   DrawBeachLines(sweepLine = -1, fillColor = "rgba(0, 0, 255, 0.2)") {
-    if (sweepLine === -1) {
-      sweepLine = this.GetCurrentResult()?.y ?? -1;
-    }
-
-    if (this.showBeachline && sweepLine !== -1 && this.step < this.results.length - 1) {
-      let sites = this.points.filter(point => point.y < sweepLine);
-      let left = Math.min(this.bbox.xl, this.bbox.xr);
-      let right = Math.max(this.bbox.xl, this.bbox.xr);
-      let step = (Math.abs(left - right)) / 1000;
-
-      this.ctx.beginPath(); // Start path
-
-      // Move to the top-left corner of the bounding box
-      this.ctx.moveTo(left, Math.min(this.bbox.yt, this.bbox.yb));
-
-      // Draw the parabola curve
-      for (let x = left; x <= right; x += step) {
-        let y = Math.max(...sites.map(site => {
-          let h = site.x;
-          let k = site.y;
-          let d = sweepLine;
-          return ((x - h) ** 2) / (2 * (k - d)) + (k + d) / 2;
-        }));
-
-        // Draw the curve but only within the bounding box
-        if (y < Math.max(this.bbox.yt, this.bbox.yb) && y > Math.min(this.bbox.yt, this.bbox.yb)) {
-          this.ctx.lineTo(x, y);
-        }
+    if (this.showBeachline && this.inAlgorithm) {
+      if (sweepLine === -1) {
+        sweepLine = this.GetSweepline();
       }
+      if (sweepLine !== -1) {
+        let sites = this.points.filter(point => point.y < sweepLine);
+        let left = Math.min(this.bbox.xl, this.bbox.xr);
+        let right = Math.max(this.bbox.xl, this.bbox.xr);
+        let step = (Math.abs(left - right)) / 1000;
 
-      // Close the path upwards to the top boundary
-      this.ctx.lineTo(right, Math.min(this.bbox.yt, this.bbox.yb)); // Top-right corner
-      this.ctx.lineTo(left, Math.min(this.bbox.yt, this.bbox.yb));  // Back to top-left corner
+        this.ctx.beginPath(); // Start path
 
-      // Set fill style and fill the area above the parabola
-      this.ctx.fillStyle = fillColor;
-      this.ctx.fill();
+        // Move to the top-left corner of the bounding box
+        this.ctx.moveTo(left, Math.min(this.bbox.yt, this.bbox.yb));
 
-      // Stroke the beach line curve
-      this.ctx.strokeStyle = "white";
-      this.ctx.lineWidth = 0;
-      this.ctx.stroke();
+        // Draw the parabola curve
+        for (let x = left; x <= right; x += step) {
+          let y = Math.max(...sites.map(site => {
+            let h = site.x;
+            let k = site.y;
+            let d = sweepLine;
+            return ((x - h) ** 2) / (2 * (k - d)) + (k + d) / 2;
+          }));
 
-      this.ctx.closePath();
-
-      let first = false;
-      this.ctx.beginPath();
-
-      for (let x = left; x <= right; x += step) {
-        let y = Math.max(...sites.map(site => {
-          let h = site.x;
-          let k = site.y;
-          let d = sweepLine;
-          return ((x - h) ** 2) / (2 * (k - d)) + (k + d) / 2;
-        }))
-
-
-        if (y < Math.max(this.bbox.yt, this.bbox.yb) && y > Math.min(this.bbox.yt, this.bbox.yb)) {
-          if (first) {
+          // Draw the curve but only within the bounding box
+          if (y < Math.max(this.bbox.yt, this.bbox.yb) && y > Math.min(this.bbox.yt, this.bbox.yb)) {
             this.ctx.lineTo(x, y);
-          } else {
-            first = true;
           }
-          this.ctx.moveTo(x, y);
-          this.ctx.strokeStyle = "blue";
-          this.ctx.lineWidth = 2;
-          this.ctx.stroke();
         }
 
+        // Close the path upwards to the top boundary
+        this.ctx.lineTo(right, Math.min(this.bbox.yt, this.bbox.yb)); // Top-right corner
+        this.ctx.lineTo(left, Math.min(this.bbox.yt, this.bbox.yb));  // Back to top-left corner
+
+        // Set fill style and fill the area above the parabola
+        this.ctx.fillStyle = fillColor;
+        this.ctx.fill();
+
+        // Stroke the beach line curve
+        this.ctx.strokeStyle = "white";
+        this.ctx.lineWidth = 0;
+        this.ctx.stroke();
+
+        this.ctx.closePath();
+
+        let first = false;
+        this.ctx.beginPath();
+
+        for (let x = left; x <= right; x += step) {
+          let y = Math.max(...sites.map(site => {
+            let h = site.x;
+            let k = site.y;
+            let d = sweepLine;
+            return ((x - h) ** 2) / (2 * (k - d)) + (k + d) / 2;
+          }))
+
+
+          if (y < Math.max(this.bbox.yt, this.bbox.yb) && y > Math.min(this.bbox.yt, this.bbox.yb)) {
+            if (first) {
+              this.ctx.lineTo(x, y);
+            } else {
+              first = true;
+            }
+            this.ctx.moveTo(x, y);
+            this.ctx.strokeStyle = "blue";
+            this.ctx.lineWidth = 2;
+            this.ctx.stroke();
+          }
+
+        }
       }
     }
   }
-
-
 
   DrawCircle(circleEvent, lineColor = "purple", centerColor = "red") {
     let x = circleEvent.x;
@@ -518,14 +530,11 @@ class Canvas {
   }
 
   DrawCircleEvents() {
-    let drewCircleEvents = false;
-    if (this.showCircles && this.GetCurrentResult() && this.step < this.results.length - 1) {
-      this.GetCurrentResult().circleEvents?.forEach(circleEvent => {
+    if (this.showCircles && this.inAlgorithm) {
+      this.GetCurrentResult().circles?.forEach(circleEvent => {
         this.DrawCircle(circleEvent);
-        drewCircleEvents = true;
       });
     }
-    return drewCircleEvents;
   }
 
   NextTransition(smooth = true, autoPlay = false) {
@@ -557,12 +566,16 @@ class Canvas {
 
   ToggleShowBeachline() {
     this.showBeachline = !this.showBeachline;
-    this.DrawCurrentState();
+    if (this.inAlgorithm) {
+      this.DrawCurrentState();
+    }
   }
 
   ToggleShowCircles() {
     this.showCircles = !this.showCircles;
-    this.DrawCurrentState();
+    if (this.inAlgorithm) {
+      this.DrawCurrentState();
+    }
   }
 
   PauseAutoPlay() {
@@ -580,53 +593,33 @@ class Canvas {
     });
   }
 
-  GetStep() {
-    return this.step;
-  }
-
-  ExitAlgorithm() {
-    this.step = this.results.length - 1;
-    this.UpdateStep();
-    this.DrawCurrentState();
-  }
-
-  IsEndOfAlgorithm() {
-    return this.step === this.results.length - 1;
-  }
-
   Transition(smooth = true, previous = false, autoPlay = false) {
 
-    if ((this.points?.length ?? 0) < 2 || this.results.length <= 1) {
+    if (!this.inAlgorithm) {
+      return false;
+    }
+    if ((this.points?.length ?? 0) < 2 || this.steps.length <= 1) {
         return false;
     }
 
     let lastStep = this.step;
-    let currentStep = (this.step + (previous ? -1 : 1)) % (this.results.length);
+    let currentStep = this.step + (previous ? -1 : 1);
 
-    // this.step = currentStep;
-    // this.UpdateStep();
-
-    if ((lastStep === this.results.length - 1) && (currentStep === 0) && !previous) {
-      lastStep = currentStep; // lastStep = currentStep;
-    } else if ((lastStep === 0) && previous) {
-      lastStep = currentStep;
+    if (currentStep <= -2 || lastStep <= -2 || currentStep > this.numSteps || lastStep > this.numSteps) {
+      this.ToggleInAlgorithm();
+      this.step = -1;
+      this.DrawCurrentState();
+      return false;
     }
 
-    let lastResult = this.results[lastStep];
-    let currentResult = this.results[currentStep];
+    let lastResult = this.GetResultAtStep(lastStep);
+    let currentResult = this.GetResultAtStep(currentStep);
 
-    let lastSweepLine = lastResult.y;
-    let currentSweepLine = currentResult.y;
+    let lastSweepLine = lastResult.sweepLine;
+    let currentSweepLine = currentResult.sweepLine;
 
-    if (lastStep === currentStep && lastStep === 0 && !previous) {
-      lastSweepLine = Math.min(this.bbox.yt, this.bbox.yb);
-    } if (lastStep === currentStep && lastStep === 0 && previous) {
-      currentSweepLine = Math.min(this.bbox.yt, this.bbox.yb);
-    } else if (lastStep === currentStep && lastStep === this.results.length - 1 && previous) {
-      lastSweepLine = Math.max(this.bbox.yt, this.bbox.yb);
-    } else if (lastStep === currentStep && lastStep === this.results.length - 1 && !previous) {
-      currentSweepLine = Math.max(this.bbox.yt, this.bbox.yb);
-    }
+
+    this.step = currentStep;
 
     if (smooth && this.smoothTransitions && (lastSweepLine !== currentSweepLine)) {
 
@@ -638,14 +631,9 @@ class Canvas {
         valuesOfI.push(i);
       }
 
-      if (currentStep === this.results.length - 1 && !previous) {
-        this.Animate(valuesOfI, 0, currentStep, autoPlay);
-      } else {
-        this.Animate(valuesOfI, 0, currentStep, autoPlay);
-      }
+      this.Animate(valuesOfI, 0, autoPlay);
 
     } else {
-      this.step = currentStep;
       this.UpdateStep();
       this.DrawCurrentState();
     }
@@ -659,7 +647,7 @@ class Canvas {
     this.DrawCircleEvents();
     this.DrawSweepLine();
     this.DrawPoints();
-    this.UpdateSweepLine(this.GetCurrentResult()?.y ?? Math.min(this.bbox.yt, this.bbox.yb));
+    this.UpdateSweepLine(this.GetCurrentResult()?.sweepLine ?? Math.min(this.bbox.yt, this.bbox.yb));
   }
 
   UpdateSpeed(speed) {
@@ -677,32 +665,24 @@ class Canvas {
   }
 
   UpdateArcs() {
-    document.getElementById("arcs").innerText = `${this.GetCurrentResult()?.numArcs ?? 0}`;
+    document.getElementById("arcs").innerText = `${this.GetCurrentResult()?.circles?.length ?? 0}`;
   }
 
   UpdateEdges() {
     let numEdges = this.GetCurrentResult()?.edges?.filter(
         (edge) => {
-            return edge.va.x !== edge.vb.x && edge.va.y !== edge.vb.y;
+            return edge.va && edge.vb && edge.va.x !== edge.vb.x && edge.va.y !== edge.vb.y;
         }
     )?.length ?? 0;
     document.getElementById("edges").innerText = `${numEdges}`;
   }
 
-  Animate(valuesOfI, index, step, autoPlay) {
+  Animate(valuesOfI, index, autoPlay) {
     if (this.interruptedAnimation) {
       this.interruptedAnimation = false;
-      this.step = step;
-      this.UpdateStep();
-      this.DrawCurrentState();
-      this.DrawHorizontalLine(valuesOfI[valuesOfI.length - 1], "red");
       return;
     }
     if (index >= valuesOfI.length) {
-      this.step = step;
-      this.UpdateStep();
-      this.DrawCurrentState();
-      this.DrawHorizontalLine(valuesOfI[valuesOfI.length - 1], "red");
       if (autoPlay) {
         requestAnimationFrame(() => this.NextTransition(true, true));
       }
@@ -712,20 +692,16 @@ class Canvas {
     const frame = () => {
       if (this.interruptedAnimation) {
         this.interruptedAnimation = false;
-        this.step = step;
-        this.UpdateStep();
-        this.DrawCurrentState();
-        this.DrawHorizontalLine(valuesOfI[valuesOfI.length - 1], "red");
         return;
       }
       this.UpdateSweepLine(i);
       this.ClearCanvas();
-      this.DrawEdges(step);
+      this.DrawEdges();
       this.DrawBeachLines(i);
       this.DrawCircleEvents();
       this.DrawHorizontalLine(i, "red");
       this.DrawPoints();
-      this.Animate(valuesOfI, index + 1, step, autoPlay);
+      this.Animate(valuesOfI, index + 1, autoPlay);
     };
     requestAnimationFrame(frame);
   }
