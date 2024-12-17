@@ -26,6 +26,10 @@
             <h3>Click anywhere in the canvas to add a point, or drag existing points to a new position.</h3>
             <div class="canvas-container">
                 <canvas id="main-canvas"></canvas>
+                <div id="popup" style="display: none; position: absolute; background: rgba(0, 0, 0, 0.8); color: white; padding: 5px; border-radius: 5px; font-size: 12px; pointer-events: none;">
+                    Coordinates: (x, y)
+                </div>
+
             </div>
         </div>
         
@@ -51,7 +55,10 @@
                     <input type="checkbox" id="show-beachline" checked/> Show Beach Line
                 </label>
                 <label>
-                    <input type="checkbox" id="show-circle-events" /> Show Circle Events
+                    <input type="checkbox" id="show-circle-events" checked/> Show Circle Events
+                </label>
+                <label>
+                    <input type="checkbox" id="smooth-transition" checked/> Smooth Transition
                 </label>
             </div>
             <div class="description-panel">

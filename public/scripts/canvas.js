@@ -14,7 +14,8 @@ class Canvas {
     this.points = [];
     this.step = 0;
     this.showBeachline = true;
-    this.showCircles = false;
+    this.showCircles = true;
+    this.smoothTransitions = true;
     this.animationSpeed = 100;
     this.interruptedAnimation = false;
     this.initialized = false;
@@ -46,7 +47,9 @@ class Canvas {
         point.x = point.x * wScale;
         point.y = point.y * hScale;
       });
+      this.DrawCurrentState()
     }
+
   }
 
   GetPointAtPosition(x, y) {
@@ -78,6 +81,7 @@ class Canvas {
         if (this.points.length > 1 && this.step === this.results.length - 1) {
           this.initialized = false;
         }
+        this.initialized = false;
         this.ComputeVoronoi();
         this.DrawCurrentState();
       }
@@ -119,7 +123,7 @@ class Canvas {
       while (true) {
         const x = Math.random() * this.Width();
         const y = Math.random() * this.Height();
-        if (this.AddPoint(x, y, false)) {
+        if (this.AddPoint(x, y, true)) {
           break;
         }
       }
@@ -290,6 +294,10 @@ class Canvas {
     this.ctx.stroke();
   }
 
+  ToggleSmoothTransitions() {
+    this.smoothTransitions = !this.smoothTransitions;
+  }
+
   DrawPoints() {
     if (!this.initialized || (this.points?.length ?? 0) === 1) {
       this.points.forEach(point => {
@@ -369,7 +377,7 @@ class Canvas {
   DrawSweepLine() {
     let drewSweepLine = false;
     if (this.GetCurrentResult()) {
-      this.DrawHorizontalLine(this.GetCurrentResult()?.sweepLine, "red");
+      this.DrawHorizontalLine(this.GetCurrentResult()?.y, "red");
       return true;
     }
     return false;
@@ -620,7 +628,7 @@ class Canvas {
       currentSweepLine = Math.max(this.bbox.yt, this.bbox.yb);
     }
 
-    if (smooth && (lastSweepLine !== currentSweepLine)) {
+    if (smooth && this.smoothTransitions && (lastSweepLine !== currentSweepLine)) {
 
       let valuesOfI = [];
 

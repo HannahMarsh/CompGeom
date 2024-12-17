@@ -145,9 +145,26 @@ canvas.addEventListener("mousedown", (event) => {
 
 // Update point position while dragging
 canvas.addEventListener("mousemove", (event) => {
+    const rect = canvas.getBoundingClientRect();
+    const mouseX = event.clientX - rect.left;
+    const mouseY = event.clientY - rect.top;
     if (draggingPoint) {
-        const rect = canvas.getBoundingClientRect();
-        draggingPoint = canvasWrapper.MovePoint(draggingPoint, event.clientX - rect.left, event.clientY - rect.top);
+        draggingPoint = canvasWrapper.MovePoint(draggingPoint, mouseX, mouseY);
+    } else {
+        let point = canvasWrapper.GetPointAtPosition(mouseX, mouseY);
+        const popup = document.getElementById("popup");
+        if (point) {
+            canvas.style.cursor = "pointer";
+            // Update popup content and position
+
+            popup.style.display = "block";
+            popup.style.left = `${event.clientX + 10}px`; // Offset popup slightly
+            popup.style.top = `${event.clientY + 10}px`;
+            popup.textContent = `Coordinates: (${Math.round(point.x)}, ${Math.round(point.y)})`;
+        } else {
+            canvas.style.cursor = "default";
+            popup.style.display = "none";
+        }
     }
 });
 
@@ -310,6 +327,11 @@ document.getElementById("show-beachline").addEventListener("change", (event) => 
 document.getElementById("show-circle-events").addEventListener("change", (event) => {
     console.log("Show circles.");
     canvasWrapper.ToggleShowCircles();
+});
+
+document.getElementById("smooth-transition").addEventListener("change", (event) => {
+    console.log("Show circles.");
+    canvasWrapper.ToggleSmoothTransitions()
 });
 
 // Speed mapping
