@@ -69,6 +69,10 @@ class Edge {
         this.setEdgeStartpoint(rSite, lSite, vertex);
     }
 
+    copy() {
+        return new Edge(this.lSite.copy(), this.rSite.copy(), this.va.copy(), this.vb.copy());
+    }
+
 }
 
 class Diagram {
@@ -82,11 +86,19 @@ class Vertex {
         this.x = x;
         this.y = y;
     }
+
+    copy() {
+        return new Vertex(this.x, this.y);
+    }
 }
 
 class Beachsection {
     constructor(site) {
         this.site = site;
+    }
+
+    copy() {
+        return new Beachsection(this.site.copy());
     }
 }
 
@@ -98,8 +110,23 @@ class CircleEvent {
         this.rbParent = null;
         this.rbRed = false;
         this.site = null;
+        this.x = this.y = this.ycenter = this.radius = 0;
     }
 
+    copy() {
+        const ce = new CircleEvent();
+        ce.arc = this.arc?.copy();
+        ce.site = this.site?.copy();
+        ce.rbLeft = this.rbLeft?.copy();
+        ce.rbPrevious = this.rbPrevious?.copy();
+        ce.rbParent = this.rbParent?.copy();
+        ce.rbRed = this.rbRed;
+        ce.x = this.x;
+        ce.y = this.y;
+        ce.ycenter = this.ycenter;
+        ce.radius = this.radius;
+        return ce;
+    }
 }
 
 class Voronoi {
@@ -680,95 +707,6 @@ class Voronoi {
             cell.closeMe = false;
         }
     }
-    //
-    // compute(sites, bbox) {
-    //     // to measure execution time
-    //     var startTime = new Date();
-    //
-    //     // init internal state
-    //     this.reset();
-    //
-    //     // Initialize site event queue
-    //     var siteEvents = sites.slice(0);
-    //     siteEvents.sort(function (a, b) {
-    //         var r = b.y - a.y;
-    //         if (r) {
-    //             return r;
-    //         }
-    //         return b.x - a.x;
-    //     });
-    //
-    //     // process queue
-    //     var site = siteEvents.pop(),
-    //         siteid = 0,
-    //         xsitex, // to avoid duplicate sites
-    //         xsitey,
-    //         cells = this.cells,
-    //         circle;
-    //
-    //     let step_i = -1;
-    //
-    //     // main loop
-    //     for (; ;) {
-    //         step_i++;
-    //         // we need to figure whether we handle a site or circle event
-    //         // for this we find out if there is a site event and it is
-    //         // 'earlier' than the circle event
-    //         circle = this.firstCircleEvent;
-    //
-    //         // add beach section
-    //         if (site && (!circle || site.y < circle.y || (site.y === circle.y && site.x < circle.x))) {
-    //             // only if site is not a duplicate
-    //             if (site.x !== xsitex || site.y !== xsitey) {
-    //                 // first create cell for new site
-    //                 cells[siteid] = new Cell(site);
-    //                 site.voronoiId = siteid++;
-    //                 // then create a beachsection for that site
-    //                 this.addBeachsection(site);
-    //                 // remember last site coords to detect duplicate
-    //                 xsitey = site.y;
-    //                 xsitex = site.x;
-    //             }
-    //             site = siteEvents.pop();
-    //         }
-    //
-    //         // remove beach section
-    //         else if (circle) {
-    //             this.removeBeachsection(circle.arc);
-    //         }
-    //
-    //         // all done, quit
-    //         else {
-    //             break;
-    //         }
-    //     }
-    //
-    //     // wrapping-up:
-    //     //   connect dangling edges to bounding box
-    //     //   cut edges as per bounding box
-    //     //   discard edges completely outside bounding box
-    //     //   discard edges which are point-like
-    //     this.clipEdges(bbox);
-    //
-    //     //   add missing edges in order to close opened cells
-    //     this.closeCells(bbox);
-    //
-    //     // to measure execution time
-    //     var stopTime = new Date();
-    //
-    //     // prepare return values
-    //     var diagram = new Diagram();
-    //     diagram.cells = this.cells;
-    //     diagram.edges = this.edges;
-    //     diagram.vertices = this.vertices;
-    //     diagram.execTime = stopTime.getTime() - startTime.getTime();
-    //     diagram.i = step_i;
-    //
-    //     // clean up
-    //     this.reset();
-    //
-    //     return diagram;
-    // }
 
     compute(sites, bbox) {
         // reset internal state
