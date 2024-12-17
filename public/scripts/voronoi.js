@@ -105,7 +105,6 @@ class CircleEvent {
 class Voronoi {
 
     constructor() {
-        // initialization of main structures
         this.vertices = [];
         this.edges = [];
         this.cells = [];
@@ -120,6 +119,9 @@ class Voronoi {
 
     eqEps(a, b) {
         return Math.abs(a - b) < 1e-9;
+    }
+    neqEps(a, b) {
+        return !this.eqEps(a, b);
     }
     gtEps(a, b) {
         return a - b > 1e-9;
@@ -187,8 +189,7 @@ class Voronoi {
         // fallback: if no right neighbor exists
         return arc.site.y === sweepLineY ? arc.site.x : Infinity;
     }
-
-
+    
     detachBeachsection(beachsection) {
         this.detachCircleEvent(beachsection); // detach potentially attached circle event
         this.beachline.Remove(beachsection); // remove from RB-tree
@@ -342,333 +343,200 @@ class Voronoi {
     }
 
     attachCircleEvent(arc) {
-        // get the neighboring arcs (left and right)
-        const lArc = arc.rbPrevious, rArc = arc.rbNext;
+        if (!arc.rbPrevious || !arc.rbNext) return; // exit early if no valid neighbors exist
 
-        // exit early if no valid neighbors exist
-        if (!lArc || !rArc) return;
+        const lSite = arc.rbPrevious.site;
+        const cSite = arc.site;
+        const rSite = arc.rbNext.site;
 
-        // extract site positions for left, current, and right arcs
-        const lSite = lArc.site,
-            cSite = arc.site,
-            rSite = rArc.site;
+        if (lSite === rSite) return; // skip if left and right sites are identical (no valid circle)
 
-        // skip if left and right sites are identical (no valid circle)
-        if (lSite === rSite) return;
+        // center site
+        const bx = cSite.x;
+        const by = cSite.y;
 
-        // calculate relative positions with origin at cSite
-        const bx = cSite.x, by = cSite.y; // center site (origin)
-        const ax = lSite.x - bx, ay = lSite.y - by; // left site
-        const cx = rSite.x - bx, cy = rSite.y - by; // right site
+        // offsets:
+        const ax = lSite.x - bx;
+        const ay = lSite.y - by;
+        const cx = rSite.x - bx;
+        const cy = rSite.y - by;
 
-        // check if points l -> c -> r are clockwise; skip if not
         const d = 2 * (ax * cy - ay * cx); // determinant
-        if (d >= -2e-12) return; // precision safeguard
 
-        // compute center of the circumcircle relative to cSite
-        const ha = ax * ax + ay * ay; // squared distance from lSite to cSite
-        const hc = cx * cx + cy * cy; // squared distance from rSite to cSite
-        const x = (cy * ha - ay * hc) / d; // x offset
-        const y = (ax * hc - cx * ha) / d; // y offset
-        const ycenter = y + by; // absolute y-coordinate of center
+        if (d >= -2e-12 || d === 0) return; // skip if l -> c -> r aren't counterclockwise
 
-        // create a new circle event
+        // squared distances:
+        const ha = ax * ax + ay * ay; // left to center
+        const hc = cx * cx + cy * cy; // right to center
+
+        // offsets
+        const x = (cy * ha - ay * hc) / d;
+        const y = (ax * hc - cx * ha) / d;
+        const yCenter = y + by; // absolute y-coordinate of center
+
         const circleEvent = new CircleEvent();
         circleEvent.arc = arc;
         circleEvent.site = cSite;
-        circleEvent.x = x + bx; // absolute x-coordinate of center
-        circleEvent.y = ycenter + Math.sqrt(x * x + y * y); // bottom of the circle
-        circleEvent.ycenter = ycenter;
+        circleEvent.x = x + bx; // absolute x-coordinate
+        circleEvent.y = yCenter + Math.sqrt(x * x + y * y); // bottom of the circle
+        circleEvent.ycenter = yCenter;
 
-        // attach the circle event to the arc
+        // attach to the arc
         arc.circleEvent = circleEvent;
 
-        // find the insertion point in the circle event RB-tree
-        let node = this.circleEvents.root;
-        let predecessor = null;
-
+        // find the insertion point
+        let node = this.circleEvents.root, predecessor = null;
         while (node) {
-            // compare circle events based on y (then x if equal)
             if (circleEvent.y < node.y || (circleEvent.y === node.y && circleEvent.x <= node.x)) {
-                if (node.rbLeft) {
-                    node = node.rbLeft;
-                } else {
-                    predecessor = node.rbPrevious;
-                    break;
-                }
+                if (node.rbLeft) node = node.rbLeft;
+                else { predecessor = node.rbPrevious; break; }
             } else {
-                if (node.rbRight) {
-                    node = node.rbRight;
-                } else {
-                    predecessor = node;
-                    break;
-                }
+                if (node.rbRight) node = node.rbRight;
+                else { predecessor = node; break; }
             }
         }
-
-        // insert the circle event into the RB-tree
         this.circleEvents.Insert(predecessor, circleEvent);
-
-        // update the first circle event if needed
-        if (!predecessor) {
-            this.firstCircleEvent = circleEvent;
-        }
+        if (!predecessor) this.firstCircleEvent = circleEvent;
     }
 
-
-
     detachCircleEvent(arc) {
-        var circleEvent = arc.circleEvent;
-        if (circleEvent) {
-            if (!circleEvent.rbPrevious) {
-                this.firstCircleEvent = circleEvent.rbNext;
+        if (arc.circleEvent) {
+            if (!arc.circleEvent.rbPrevious) {
+                this.firstCircleEvent = arc.circleEvent.rbNext;
             }
-            this.circleEvents.Remove(circleEvent); // remove from RB-tree
+            this.circleEvents.Remove(arc.circleEvent);
             arc.circleEvent = null;
         }
     }
 
     connectEdge(edge, bbox) {
-        // skip if end point already connected
-        var vb = edge.vb;
-        if (!!vb) {
-            return true;
-        }
+        if (edge.vb) return true; // endpoint is already connected
 
-        // make local copy for performance purpose
-        var va = edge.va,
-            xl = bbox.xl,
-            xr = bbox.xr,
-            yt = bbox.yt,
-            yb = bbox.yb,
-            lSite = edge.lSite,
-            rSite = edge.rSite,
-            lx = lSite.x,
-            ly = lSite.y,
-            rx = rSite.x,
-            ry = rSite.y,
-            fx = (lx + rx) / 2,
-            fy = (ly + ry) / 2,
-            fm, fb;
+        const startVertex = edge.va;
+        const { xl: left, xr: right, yt: top, yb: bottom } = bbox;
+        const { x: leftX, y: leftY } = edge.lSite;
+        const { x: rightX, y: rightY } = edge.rSite;
 
-        // if we reach here, this means cells which use this edge will need
-        // to be closed, whether because the edge was removed, or because it
-        // was connected to the bounding box.
-        this.cells[lSite.voronoiId].closeMe = true;
-        this.cells[rSite.voronoiId].closeMe = true;
+        // midpoints
+        const midX = (leftX + rightX) / 2;
+        const midY = (leftY + rightY) / 2;
 
-        // get the line equation of the bisector if line is not vertical
-        if (ry !== ly) {
-            fm = (lx - rx) / (ry - ly);
-            fb = fy - fm * fx;
-        }
+        // mark the cells as needing to be closed
+        this.cells[edge.lSite.voronoiId].closeMe = true;
+        this.cells[edge.rSite.voronoiId].closeMe = true;
 
-        // remember, direction of line (relative to left site):
-        // upward: left.x < right.x
-        // downward: left.x > right.x
-        // horizontal: left.x == right.x
-        // upward: left.x < right.x
-        // rightward: left.y < right.y
-        // leftward: left.y > right.y
-        // vertical: left.y == right.y
-        //
-        // depending on the direction, find the best side of the
-        // bounding box to use to determine a reasonable start point
-        // While at it, since we have the values which define the line,
-        // clip the end of va if it is outside the bbox.
-        // which does not do well sometimes due to loss of arithmetic
-        // precision. The code here doesn't degrade if one of the vertex is
-        // at a huge distance.
+        // if the perp. bisector is vertical
+        if (this.eqEps(rightY, leftY)) {
+            if (midX < left || midX >= right) return false; // outside bounding box
 
-        // special case: vertical line
-        if (fm === undefined) {
-            // doesn't intersect with viewport
-            if (fx < xl || fx >= xr) {
-                return false;
+            if (leftX > rightX) { // bisector direction is downward
+                if (!startVertex || startVertex.y < top) edge.va = this.createVertex(midX, top);
+                else if (startVertex.y >= bottom) return false;
+                edge.vb = this.createVertex(midX, bottom);
+            } else { // bisector direction is upward
+                if (!startVertex || startVertex.y > bottom) edge.va = this.createVertex(midX, bottom);
+                else if (startVertex.y < top) return false;
+                edge.vb = this.createVertex(midX, top);
             }
-            // downward
-            if (lx > rx) {
-                if (!va || va.y < yt) {
-                    va = this.createVertex(fx, yt);
-                } else if (va.y >= yb) {
-                    return false;
+        } else { // slope is defined
+
+            // perpendicular bisector:
+            let slope = (leftX - rightX) / (rightY - leftY);
+            let intercept = midY - slope * midX;
+
+            // if the bisector has a steep slope, then connect to top/bottom
+            if (slope < -1 || slope > 1) {
+                if (leftX > rightX) { // downward
+                    if (!startVertex || startVertex.y < top) edge.va = this.createVertex((top - intercept) / slope, top);
+                    else if (startVertex.y >= bottom) return false;
+                    edge.vb = this.createVertex((bottom - intercept) / slope, bottom);
+                } else { // upward
+                    if (!startVertex || startVertex.y > bottom) edge.va = this.createVertex((bottom - intercept) / slope, bottom);
+                    else if (startVertex.y < top) return false;
+                    edge.vb = this.createVertex((top - intercept) / slope, top);
                 }
-                vb = this.createVertex(fx, yb);
-            }
-            // upward
-            else {
-                if (!va || va.y > yb) {
-                    va = this.createVertex(fx, yb);
-                } else if (va.y < yt) {
-                    return false;
+            } else { // if the bisector has a more shallow slope, then connect to left/right
+                if (leftY < rightY) { // rightward
+                    if (!startVertex || startVertex.x < left) edge.va = this.createVertex(left, slope * left + intercept);
+                    else if (startVertex.x >= right) return false;
+                    edge.vb = this.createVertex(right, slope * right + intercept);
+                } else { // leftward
+                    if (!startVertex || startVertex.x > right) edge.va = this.createVertex(right, slope * right + intercept);
+                    else if (startVertex.x < left) return false;
+                    edge.vb = this.createVertex(left, slope * left + intercept);
                 }
-                vb = this.createVertex(fx, yt);
             }
         }
-            // closer to vertical than horizontal, connect start point to the
-        // top or bottom side of the bounding box
-        else if (fm < -1 || fm > 1) {
-            // downward
-            if (lx > rx) {
-                if (!va || va.y < yt) {
-                    va = this.createVertex((yt - fb) / fm, yt);
-                } else if (va.y >= yb) {
-                    return false;
-                }
-                vb = this.createVertex((yb - fb) / fm, yb);
-            }
-            // upward
-            else {
-                if (!va || va.y > yb) {
-                    va = this.createVertex((yb - fb) / fm, yb);
-                } else if (va.y < yt) {
-                    return false;
-                }
-                vb = this.createVertex((yt - fb) / fm, yt);
-            }
-        }
-            // closer to horizontal than vertical, connect start point to the
-        // left or right side of the bounding box
-        else {
-            // rightward
-            if (ly < ry) {
-                if (!va || va.x < xl) {
-                    va = this.createVertex(xl, fm * xl + fb);
-                } else if (va.x >= xr) {
-                    return false;
-                }
-                vb = this.createVertex(xr, fm * xr + fb);
-            }
-            // leftward
-            else {
-                if (!va || va.x > xr) {
-                    va = this.createVertex(xr, fm * xr + fb);
-                } else if (va.x < xl) {
-                    return false;
-                }
-                vb = this.createVertex(xl, fm * xl + fb);
-            }
-        }
-        edge.va = va;
-        edge.vb = vb;
 
         return true;
     }
 
     clipEdge(edge, bbox) {
-        var ax = edge.va.x,
-            ay = edge.va.y,
-            bx = edge.vb.x,
-            by = edge.vb.y,
-            t0 = 0,
-            t1 = 1,
-            dx = bx - ax,
-            dy = by - ay;
-        // left
-        var q = ax - bbox.xl;
-        if (dx === 0 && q < 0) {
-            return false;
+        const ax = edge.va.x, ay = edge.va.y; // start
+        const bx = edge.vb.x, by = edge.vb.y; // end
+
+        let t0 = 0, t1 = 1;
+        const dx = bx - ax; // change in x direction
+        const dy = by - ay; // change in y direction
+        let q, r;
+
+        // check left boundary
+        q = ax - bbox.xl; // distance of ax from left boundary
+        if (dx === 0 && q < 0) return false; // edge is parallel and outside
+        r = -q / dx; // calculate intersection factor
+        if (dx < 0) { // edge goes leftward
+            if (r < t0) return false; // fully outside
+            if (r < t1) t1 = r; // clip end point
+        } else if (dx > 0) { // edge goes rightward
+            if (r > t1) return false; // fully outside
+            if (r > t0) t0 = r; // clip start point
         }
-        var r = -q / dx;
-        if (dx < 0) {
-            if (r < t0) {
-                return false;
-            }
-            if (r < t1) {
-                t1 = r;
-            }
-        } else if (dx > 0) {
-            if (r > t1) {
-                return false;
-            }
-            if (r > t0) {
-                t0 = r;
-            }
-        }
-        // right
+
+        // check right boundary
         q = bbox.xr - ax;
-        if (dx === 0 && q < 0) {
-            return false;
-        }
+        if (dx === 0 && q < 0) return false;
         r = q / dx;
-        if (dx < 0) {
-            if (r > t1) {
-                return false;
-            }
-            if (r > t0) {
-                t0 = r;
-            }
-        } else if (dx > 0) {
-            if (r < t0) {
-                return false;
-            }
-            if (r < t1) {
-                t1 = r;
-            }
+        if (dx < 0) { // edge goes leftward
+            if (r > t1) return false;
+            if (r > t0) t0 = r;
+        } else if (dx > 0) { // edge goes rightward
+            if (r < t0) return false;
+            if (r < t1) t1 = r;
         }
-        // top
+
+        // check top boundary
         q = ay - bbox.yt;
-        if (dy === 0 && q < 0) {
-            return false;
-        }
+        if (dy === 0 && q < 0) return false; // edge is parallel and outside
         r = -q / dy;
-        if (dy < 0) {
-            if (r < t0) {
-                return false;
-            }
-            if (r < t1) {
-                t1 = r;
-            }
-        } else if (dy > 0) {
-            if (r > t1) {
-                return false;
-            }
-            if (r > t0) {
-                t0 = r;
-            }
+        if (dy < 0) { // edge goes upward
+            if (r < t0) return false;
+            if (r < t1) t1 = r;
+        } else if (dy > 0) { // edge goes downward
+            if (r > t1) return false;
+            if (r > t0) t0 = r;
         }
-        // bottom
+
+        // check bottom boundary
         q = bbox.yb - ay;
-        if (dy === 0 && q < 0) {
-            return false;
-        }
+        if (dy === 0 && q < 0) return false;
         r = q / dy;
-        if (dy < 0) {
-            if (r > t1) {
-                return false;
-            }
-            if (r > t0) {
-                t0 = r;
-            }
-        } else if (dy > 0) {
-            if (r < t0) {
-                return false;
-            }
-            if (r < t1) {
-                t1 = r;
-            }
+        if (dy < 0) { // edge goes upward
+            if (r > t1) return false;
+            if (r > t0) t0 = r;
+        } else if (dy > 0) { // edge goes downward
+            if (r < t0) return false;
+            if (r < t1) t1 = r;
         }
 
-        // if we reach this point, Voronoi edge is within bbox
-
-        // if t0 > 0, va needs to change
-        // we need to create a new vertex rather
-        // than modifying the existing one, since the existing
-        // one is likely shared with at least another edge
         if (t0 > 0) {
             edge.va = this.createVertex(ax + t0 * dx, ay + t0 * dy);
         }
 
-        // if t1 < 1, vb needs to change
-        // we need to create a new vertex rather
-        // than modifying the existing one, since the existing
-        // one is likely shared with at least another edge
         if (t1 < 1) {
             edge.vb = this.createVertex(ax + t1 * dx, ay + t1 * dy);
         }
 
-        // va and/or vb were clipped, thus we will need to close
-        // cells which use this edge.
+        // mark cells to close if vertices were clipped
         if (t0 > 0 || t1 < 1) {
             this.cells[edge.lSite.voronoiId].closeMe = true;
             this.cells[edge.rSite.voronoiId].closeMe = true;
@@ -678,22 +546,18 @@ class Voronoi {
     }
 
     clipEdges(bbox) {
-        // connect all dangling edges to bounding box
-        // or get rid of them if it can't be done
-        var edges = this.edges,
-            iEdge = edges.length,
-            edge,
-            abs_fn = Math.abs;
+        const edges = this.edges;
+        let iEdge = edges.length;
 
         // iterate backward so we can splice safely
         while (iEdge--) {
-            edge = edges[iEdge];
-            // edge is removed if:
-            //   it is wholly outside the bounding box
-            //   it is looking more like a point than a line
-            if (!this.connectEdge(edge, bbox) ||
-                !this.clipEdge(edge, bbox) ||
-                (abs_fn(edge.va.x - edge.vb.x) < 1e-9 && abs_fn(edge.va.y - edge.vb.y) < 1e-9)) {
+            let edge = edges[iEdge]; // edge is removed if it's outside the bounding box or if it's close to zero length
+
+            // check if edge is invalid:
+            if (!this.connectEdge(edge, bbox) || // cannot connect to bounding box
+                    !this.clipEdge(edge, bbox) || // cannot clip within bounding box
+                    (this.eqEps(edge.va.x, edge.vb.x) && this.eqEps(edge.va.y, edge.vb.y))) { // edge is degenerate (very small or zero length)
+
                 edge.va = edge.vb = null;
                 edges.splice(iEdge, 1);
             }
@@ -701,107 +565,84 @@ class Voronoi {
     }
 
     closeCells(bbox) {
-        var xl = bbox.xl,
-            xr = bbox.xr,
-            yt = bbox.yt,
-            yb = bbox.yb,
-            cells = this.cells,
-            iCell = cells.length,
-            cell,
-            iLeft,
-            halfedges, nHalfedges,
-            edge,
-            va, vb, vz,
-            lastBorderSegment,
-            abs_fn = Math.abs;
+        const xl = bbox.xl, xr = bbox.xr, yt = bbox.yt, yb = bbox.yb;
+        let edge, va, vb, vz, lastBorderSegment;
 
-        while (iCell--) {
-            cell = cells[iCell];
-            // prune, order halfedges counterclockwise, then add missing ones
-            // required to close cells
-            if (!cell.prepareHalfedges()) {
-                continue;
-            }
-            if (!cell.closeMe) {
-                continue;
-            }
-            // find first 'unclosed' point.
-            // an 'unclosed' point will be the end point of a halfedge which
-            // does not match the start point of the following halfedge
-            halfedges = cell.halfedges;
-            nHalfedges = halfedges.length;
-            // special case: only one site, in which case, the viewport is the cell
-            // ...
+        for (let iCell = this.cells.length - 1; iCell >= 0; iCell--) {
+            const cell = this.cells[iCell];
+
+            // prepare halfedges: prune, order counterclockwise
+
+
+            if (!cell.prepareHalfedges() || !cell.closeMe)  continue; // skip if cell is already closed or invalid
+
+            let halfedges = cell.halfedges;
+            let nHalfedges = halfedges.length;
 
             // all other cases
-            iLeft = 0;
-            while (iLeft < nHalfedges) {
+            for (let iLeft = 0; iLeft < nHalfedges; iLeft++) {
                 va = halfedges[iLeft].getEndpoint();
                 vz = halfedges[(iLeft + 1) % nHalfedges].getStartpoint();
-                // if end point is not equal to start point, we need to add the missing
-                // halfedge(s) up to vz
-                if (abs_fn(va.x - vz.x) >= 1e-9 || abs_fn(va.y - vz.y) >= 1e-9) {
 
-                    // "Holes" in the halfedges are not necessarily always adjacent.
+                // check if the endpoint (va) matches the startpoint (vz)
+                if (this.neqEps(va.x, vz.x) || this.eqEps(va.y, vz.y)) {
+                    let continue_switch = true;
 
-                    // find entry point:
-                    switch (true) {
-
-                        // walk downward along left side
-                        case this.eqEps(va.x, xl) && this.ltEps(va.y, yb):
-                            lastBorderSegment = this.eqEps(vz.x, xl);
-                            vb = this.createVertex(xl, lastBorderSegment ? vz.y : yb);
-                            edge = this.createBorderEdge(cell.site, va, vb);
-                            iLeft++;
-                            halfedges.splice(iLeft, 0, new Halfedge(edge, cell.site, null));
-                            nHalfedges++;
-                            if (lastBorderSegment) {
-                                break;
-                            }
+                    // walk downward along the left side of the bounding box
+                    if (this.eqEps(va.x, xl) && this.ltEps(va.y, yb)) {
+                        lastBorderSegment = this.eqEps(vz.x, xl);
+                        vb = this.createVertex(xl, lastBorderSegment ? vz.y : yb);
+                        edge = this.createBorderEdge(cell.site, va, vb);
+                        iLeft++;
+                        halfedges.splice(iLeft, 0, new Halfedge(edge, cell.site, null));
+                        nHalfedges++;
+                        if (!lastBorderSegment) {
                             va = vb;
-                        // fall through
+                        } else {
+                            continue_switch = false;
+                        }
+                    }
 
-                        // walk rightward along bottom side
-                        case this.eqEps(va.y, yb) && this.ltEps(va.x, xr):
-                            lastBorderSegment = this.eqEps(vz.y, yb);
-                            vb = this.createVertex(lastBorderSegment ? vz.x : xr, yb);
-                            edge = this.createBorderEdge(cell.site, va, vb);
-                            iLeft++;
-                            halfedges.splice(iLeft, 0, new Halfedge(edge, cell.site, null));
-                            nHalfedges++;
-                            if (lastBorderSegment) {
-                                break;
-                            }
+                    // walk rightward along the bottom side
+                    if (continue_switch && (this.eqEps(va.y, yb) && this.ltEps(va.x, xr))) {
+                        lastBorderSegment = this.eqEps(vz.y, yb);
+                        vb = this.createVertex(lastBorderSegment ? vz.x : xr, yb);
+                        edge = this.createBorderEdge(cell.site, va, vb);
+                        iLeft++;
+                        halfedges.splice(iLeft, 0, new Halfedge(edge, cell.site, null));
+                        nHalfedges++;
+                        if (!lastBorderSegment) {
                             va = vb;
-                        // fall through
+                        } else {
+                            continue_switch = false;
+                        }
+                    }
 
-                        // walk upward along right side
-                        case this.eqEps(va.x, xr) && this.gtEps(va.y, yt):
-                            lastBorderSegment = this.eqEps(vz.x, xr);
-                            vb = this.createVertex(xr, lastBorderSegment ? vz.y : yt);
-                            edge = this.createBorderEdge(cell.site, va, vb);
-                            iLeft++;
-                            halfedges.splice(iLeft, 0, new Halfedge(edge, cell.site, null));
-                            nHalfedges++;
-                            if (lastBorderSegment) {
-                                break;
-                            }
+                    // walk upward along the right side of the bounding box
+                    if (continue_switch && (this.eqEps(va.x, xr) && this.gtEps(va.y, yt))) {
+                        lastBorderSegment = this.eqEps(vz.x, xr);
+                        vb = this.createVertex(xr, lastBorderSegment ? vz.y : yt);
+                        edge = this.createBorderEdge(cell.site, va, vb);
+                        iLeft++;
+                        halfedges.splice(iLeft, 0, new Halfedge(edge, cell.site, null));
+                        nHalfedges++;
+                        if (!lastBorderSegment) {
                             va = vb;
-                        // fall through
+                        } else {
+                            continue_switch = false;
+                        }
+                    }
 
-                        // walk leftward along top side
-                        case this.eqEps(va.y, yt) && this.gtEps(va.x, xl):
-                            lastBorderSegment = this.eqEps(vz.y, yt);
-                            vb = this.createVertex(lastBorderSegment ? vz.x : xl, yt);
-                            edge = this.createBorderEdge(cell.site, va, vb);
-                            iLeft++;
-                            halfedges.splice(iLeft, 0, new Halfedge(edge, cell.site, null));
-                            nHalfedges++;
-                            if (lastBorderSegment) {
-                                break;
-                            }
+                    // walk left along the top side of the bounding box
+                    if (continue_switch && (this.eqEps(va.y, yt) && this.gtEps(va.x, xl))) {
+                        lastBorderSegment = this.eqEps(vz.y, yt);
+                        vb = this.createVertex(lastBorderSegment ? vz.x : xl, yt);
+                        edge = this.createBorderEdge(cell.site, va, vb);
+                        iLeft++;
+                        halfedges.splice(iLeft, 0, new Halfedge(edge, cell.site, null));
+                        nHalfedges++;
+                        if (!lastBorderSegment) {
                             va = vb;
-                            // fall through
 
                             // walk downward along left side
                             lastBorderSegment = this.eqEps(vz.x, xl);
@@ -810,46 +651,39 @@ class Voronoi {
                             iLeft++;
                             halfedges.splice(iLeft, 0, new Halfedge(edge, cell.site, null));
                             nHalfedges++;
-                            if (lastBorderSegment) {
-                                break;
-                            }
-                            va = vb;
-                            // fall through
+                            if (!lastBorderSegment) {
+                                va = vb;
 
-                            // walk rightward along bottom side
-                            lastBorderSegment = this.eqEps(vz.y, yb);
-                            vb = this.createVertex(lastBorderSegment ? vz.x : xr, yb);
-                            edge = this.createBorderEdge(cell.site, va, vb);
-                            iLeft++;
-                            halfedges.splice(iLeft, 0, new Halfedge(edge, cell.site, null));
-                            nHalfedges++;
-                            if (lastBorderSegment) {
-                                break;
-                            }
-                            va = vb;
-                            // fall through
+                                // walk rightward along bottom side
+                                lastBorderSegment = this.eqEps(vz.y, yb);
+                                vb = this.createVertex(lastBorderSegment ? vz.x : xr, yb);
+                                edge = this.createBorderEdge(cell.site, va, vb);
+                                iLeft++;
+                                halfedges.splice(iLeft, 0, new Halfedge(edge, cell.site, null));
+                                nHalfedges++;
+                                if (!lastBorderSegment) {
+                                    va = vb;
 
-                            // walk upward along right side
-                            lastBorderSegment = this.eqEps(vz.x, xr);
-                            vb = this.createVertex(xr, lastBorderSegment ? vz.y : yt);
-                            edge = this.createBorderEdge(cell.site, va, vb);
-                            iLeft++;
-                            halfedges.splice(iLeft, 0, new Halfedge(edge, cell.site, null));
-                            nHalfedges++;
-                            if (lastBorderSegment) {
-                                break;
+                                    // walk upward along right side
+                                    lastBorderSegment = this.eqEps(vz.x, xr);
+                                    vb = this.createVertex(xr, lastBorderSegment ? vz.y : yt);
+                                    edge = this.createBorderEdge(cell.site, va, vb);
+                                    iLeft++;
+                                    halfedges.splice(iLeft, 0, new Halfedge(edge, cell.site, null));
+                                    nHalfedges++;
+                                    if (!lastBorderSegment) {
+                                        throw "Voronoi.closeCells() > this makes no sense!";
+                                    }
+                                }
                             }
-                        // fall through
-
-                        default:
-                            throw "Voronoi.closeCells() > this makes no sense!";
+                        }
                     }
                 }
-                iLeft++;
             }
             cell.closeMe = false;
         }
     }
+
 
     compute(sites, bbox) {
         // to measure execution time
