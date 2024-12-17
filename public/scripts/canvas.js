@@ -72,6 +72,7 @@ class Canvas {
     const point = this.GetPointAtPosition(x, y);
     if (!point) {
       this.points.push({ x, y });
+      this.UpdateTable();
       console.log(`Added point at (${x}, ${y}).`);
       if (redraw) {
         if (this.points.length > 1 && this.step === this.results.length - 1) {
@@ -374,7 +375,7 @@ class Canvas {
     return false;
   }
 
-  DrawBeachLines(sweepLine = -1, color = "blue") {
+  DrawBeachLines2(sweepLine = -1, color = "blue") {
     if (sweepLine === -1) {
         sweepLine = this.GetCurrentResult()?.y ?? -1;
     }
@@ -411,6 +412,82 @@ class Canvas {
       }
     }
   }
+
+  DrawBeachLines(sweepLine = -1, fillColor = "rgba(0, 0, 255, 0.2)") {
+    if (sweepLine === -1) {
+      sweepLine = this.GetCurrentResult()?.y ?? -1;
+    }
+
+    if (this.showBeachline && sweepLine !== -1 && this.step < this.results.length - 1) {
+      let sites = this.points.filter(point => point.y < sweepLine);
+      let left = Math.min(this.bbox.xl, this.bbox.xr);
+      let right = Math.max(this.bbox.xl, this.bbox.xr);
+      let step = (Math.abs(left - right)) / 1000;
+
+      this.ctx.beginPath(); // Start path
+
+      // Move to the top-left corner of the bounding box
+      this.ctx.moveTo(left, Math.min(this.bbox.yt, this.bbox.yb));
+
+      // Draw the parabola curve
+      for (let x = left; x <= right; x += step) {
+        let y = Math.max(...sites.map(site => {
+          let h = site.x;
+          let k = site.y;
+          let d = sweepLine;
+          return ((x - h) ** 2) / (2 * (k - d)) + (k + d) / 2;
+        }));
+
+        // Draw the curve but only within the bounding box
+        if (y < Math.max(this.bbox.yt, this.bbox.yb) && y > Math.min(this.bbox.yt, this.bbox.yb)) {
+          this.ctx.lineTo(x, y);
+        }
+      }
+
+      // Close the path upwards to the top boundary
+      this.ctx.lineTo(right, Math.min(this.bbox.yt, this.bbox.yb)); // Top-right corner
+      this.ctx.lineTo(left, Math.min(this.bbox.yt, this.bbox.yb));  // Back to top-left corner
+
+      // Set fill style and fill the area above the parabola
+      this.ctx.fillStyle = fillColor;
+      this.ctx.fill();
+
+      // Stroke the beach line curve
+      this.ctx.strokeStyle = "white";
+      this.ctx.lineWidth = 0;
+      this.ctx.stroke();
+
+      this.ctx.closePath();
+
+      let first = false;
+      this.ctx.beginPath();
+
+      for (let x = left; x <= right; x += step) {
+        let y = Math.max(...sites.map(site => {
+          let h = site.x;
+          let k = site.y;
+          let d = sweepLine;
+          return ((x - h) ** 2) / (2 * (k - d)) + (k + d) / 2;
+        }))
+
+
+        if (y < Math.max(this.bbox.yt, this.bbox.yb) && y > Math.min(this.bbox.yt, this.bbox.yb)) {
+          if (first) {
+            this.ctx.lineTo(x, y);
+          } else {
+            first = true;
+          }
+          this.ctx.moveTo(x, y);
+          this.ctx.strokeStyle = "blue";
+          this.ctx.lineWidth = 2;
+          this.ctx.stroke();
+        }
+
+      }
+    }
+  }
+
+
 
   DrawCircle(circleEvent, lineColor = "purple", centerColor = "red") {
     let x = circleEvent.x;
@@ -484,6 +561,17 @@ class Canvas {
     this.interruptedAnimation = true;
   }
 
+  UpdateTable() {
+    //console.log("Updating points table...");
+    const tableBody = document.getElementById("points-table").querySelector("tbody");
+    tableBody.innerHTML = "";
+    this.points.sort((a, b) => {return a.y - b.y}).forEach((point, index) => {
+      const row = document.createElement("tr");
+      row.innerHTML = `<td>${index + 1}</td><td>${Math.round(point.x)}</td><td>${Math.round(point.y)}</td>`;
+      tableBody.appendChild(row);
+    });
+  }
+
   GetStep() {
     return this.step;
   }
@@ -536,7 +624,7 @@ class Canvas {
 
       let valuesOfI = [];
 
-      let step = (previous ? -1 : 1) * Math.abs((currentSweepLine - lastSweepLine) / this.animationSpeed);
+      let step = (previous ? -1 : 1) * Math.max(0.3, Math.abs((currentSweepLine - lastSweepLine) / this.animationSpeed));
 
       for (let i = lastSweepLine; previous ? i > currentSweepLine : i <= currentSweepLine; i += step) {
         valuesOfI.push(i);
