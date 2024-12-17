@@ -898,12 +898,21 @@ class Voronoi {
         this.reset();
 
         rr.forEach((r, i) => {
-            if (i !== rr.length - 1) {
+            //if (r.step !== step_i) {
+                let steps = this.computeStepByStep(sites, bbox, Math.max(...r.steps.map(s => s.step))).edges;
                 r.steps.forEach((step, j) => {
                     step.edges = this.computeStepByStep(sites, bbox, step.step).edges;
                 });
-            }
+            //}
+            // } else {
+            //     let finalEdges = this.compute(sites, bbox).edges;
+            //     r.steps.forEach((step, j) => {
+            //         step.edges = finalEdges;
+            //     });
+            // }
         });
+
+
 
         return rr; // return the final Voronoi diagram
     }

@@ -20,7 +20,7 @@ class Canvas {
     this.showBeachline = true;
     this.showCircles = true;
     this.smoothTransitions = true;
-    this.animationSpeed = 100;
+    this.animationSpeed = 1000;
     this.interruptedAnimation = false;
   }
 
@@ -621,23 +621,30 @@ class Canvas {
 
     this.step = currentStep;
 
-    if (smooth && this.smoothTransitions && (lastSweepLine !== currentSweepLine)) {
 
-      let valuesOfI = [];
 
-      let step = (previous ? -1 : 1) * Math.max(0.3, Math.abs((currentSweepLine - lastSweepLine) / this.animationSpeed));
+    if (smooth && this.smoothTransitions) {
 
-      for (let i = lastSweepLine; previous ? i > currentSweepLine : i <= currentSweepLine; i += step) {
-        valuesOfI.push(i);
+      if (lastSweepLine !== currentSweepLine) {
+
+          let valuesOfI = [];
+
+          let step = (previous ? -1 : 1) * Math.abs(this.bbox.yt - this.bbox.yb) / this.animationSpeed; // Math.max(0.3, Math.abs((currentSweepLine - lastSweepLine) / this.animationSpeed));
+
+          for (let i = lastSweepLine; previous ? i > currentSweepLine : i <= currentSweepLine; i += step) {
+            valuesOfI.push(i);
+          }
+
+          this.AnimateSweeplineAndBeachlines(valuesOfI, 0, autoPlay);
+          return;
+
+      } else if (autoPlay) {
+        requestAnimationFrame(() => this.NextTransition(true, true));
       }
-
-      this.Animate(valuesOfI, 0, autoPlay);
-
-    } else {
-      this.UpdateStep();
-      this.DrawCurrentState();
     }
-    return true;
+    this.UpdateStep();
+    this.DrawCurrentState();
+
   }
 
   DrawCurrentState() {
@@ -651,7 +658,7 @@ class Canvas {
   }
 
   UpdateSpeed(speed) {
-    this.animationSpeed = 100 / speed;
+    this.animationSpeed = 1000 / speed;
   }
 
   UpdateSweepLine(y) {
@@ -677,7 +684,8 @@ class Canvas {
     document.getElementById("edges").innerText = `${numEdges}`;
   }
 
-  Animate(valuesOfI, index, autoPlay) {
+
+  AnimateSweeplineAndBeachlines(valuesOfI, index, autoPlay) {
     if (this.interruptedAnimation) {
       this.interruptedAnimation = false;
       return;
@@ -701,7 +709,7 @@ class Canvas {
       this.DrawCircleEvents();
       this.DrawHorizontalLine(i, "red");
       this.DrawPoints();
-      this.Animate(valuesOfI, index + 1, autoPlay);
+      this.AnimateSweeplineAndBeachlines(valuesOfI, index + 1, autoPlay);
     };
     requestAnimationFrame(frame);
   }
