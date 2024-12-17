@@ -267,11 +267,20 @@ document.getElementById("pause-button").addEventListener("click", () => {
         document.getElementById("pause-button").innerText = "Pause";
         canvasWrapper.NextTransition(true, true);
         console.log("Unpaused.");
+        disableButton("back-button");
+        disableButton("next-button");
+        disableButton("fast-forward-button");
+        disableButton("visualize-fortune-button");
     } else {
         isPaused = true;
         document.getElementById("pause-button").innerText = "Auto-play";
         console.log("Paused.");
         canvasWrapper.PauseAutoPlay();
+
+        enableButton("back-button");
+        enableButton("next-button");
+        enableButton("fast-forward-button");
+        enableButton("visualize-fortune-button");
     }
 });
 
