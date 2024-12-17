@@ -197,3 +197,65 @@ button:disabled {
     color: #555;
     line-height: 1.5;
 }
+
+/* Container for the speed control */
+.speed-control {
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    width: 100%;
+    /*max-width: 800px; !* Adjust width as needed *!*/
+    padding-right: 10px;
+    box-sizing: border-box;
+}
+
+/* Label styling */
+.slider-label {
+    margin-right: 15px !important;
+}
+
+/* Slider styling */
+#speed-slider {
+    flex: 1; /* Make the slider stretch */
+    appearance: none;
+    height: 8px;
+    background: #ddd;
+    border-radius: 5px;
+    outline: none;
+    transition: background 0.3s;
+}
+
+/* Slider thumb (the handle) */
+#speed-slider::-webkit-slider-thumb {
+    appearance: none;
+    width: 20px;
+    height: 20px;
+    background: #af4ca0;
+    border-radius: 50%;
+    cursor: pointer;
+    transition: background 0.3s;
+}
+
+#speed-slider::-moz-range-thumb {
+    width: 20px;
+    height: 20px;
+    background: #af4ca0;
+    border-radius: 50%;
+    cursor: pointer;
+    transition: background 0.3s;
+}
+
+#speed-slider::-webkit-slider-thumb:hover,
+#speed-slider::-moz-range-thumb:hover {
+    background: #8b4caf; /* Darker color on hover */
+}
+
+/* Speed display styling */
+.speed-display {
+    font-size: 1.2rem;
+    font-weight: bold;
+    margin-left: 10px;
+    color: #333;
+}
+
+

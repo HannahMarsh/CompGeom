@@ -311,6 +311,33 @@ document.getElementById("show-circle-events").addEventListener("change", (event)
     canvasWrapper.ToggleShowCircles();
 });
 
+// Speed mapping
+const speedMap = {
+    1: 0.2,
+    2: 0.3,
+    3: 0.5,
+    4: 0.75,
+    5: 1,
+    6: 1.5,
+    7: 2,
+    8: 2.5,
+    9: 3
+};
+
+let animationSpeed = speedMap[5]; // Default speed for value 5
+const speedSlider = document.getElementById("speed-slider");
+const speedDisplay = document.getElementById("speed-display");
+
+// Event listener to update speed
+speedSlider.addEventListener("input", () => {
+    const sliderValue = parseInt(speedSlider.value, 10);
+    animationSpeed = speedMap[sliderValue];
+    speedDisplay.textContent = `${animationSpeed}x`;
+    console.log(`Current animation speed: ${animationSpeed}x`);
+    canvasWrapper.UpdateSpeed(animationSpeed);
+});
+
+
 
 // function initializeAlgorithm() {
 //     const bbox = { xl: 0, xr: canvas.width, yt: 0, yb: canvas.height };

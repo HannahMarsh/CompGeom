@@ -434,7 +434,7 @@ class Canvas {
 
   DrawCircleEvents() {
     let drewCircleEvents = false;
-    if (this.showCircles && this.GetCurrentResult()) {
+    if (this.showCircles && this.GetCurrentResult() && this.step < this.results.length - 1) {
       this.GetCurrentResult().circleEvents?.forEach(circleEvent => {
         this.DrawCircle(circleEvent);
         drewCircleEvents = true;
@@ -564,6 +564,10 @@ class Canvas {
     this.DrawSweepLine();
     this.DrawPoints();
     this.UpdateSweepLine(this.GetCurrentResult()?.y ?? Math.min(this.bbox.yt, this.bbox.yb));
+  }
+
+  UpdateSpeed(speed) {
+    this.animationSpeed = 100 / speed;
   }
 
   UpdateSweepLine(y) {

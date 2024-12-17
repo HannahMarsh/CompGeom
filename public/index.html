@@ -38,8 +38,15 @@
                 <button id="next-button" disabled>Next</button>
                 <button id="back-button" disabled>Back</button>
                 <button id="fast-forward-button" disabled>Fast Forward</button>
+
+
         
                 <h3 style="text-align: left;">Options</h3>
+                <div class="speed-control">
+                    <label class="slider-label" for="speed-slider">Speed:</label>
+                    <input type="range" id="speed-slider" min="1" max="9" value="5" step="1">
+                    <span id="speed-display">1x</span>
+                </div>
                 <label>
                     <input type="checkbox" id="show-beachline" checked/> Show Beach Line
                 </label>
