@@ -18,6 +18,12 @@ class Cell {
         this.halfedges.sort((a, b) => b.angle - a.angle); // sort counterclockwise
         return this.halfedges.length;
     }
+
+    copy() {
+        const cell = new Cell(this.site.copy());
+        cell.halfedges = this.halfedges.map(halfedge => halfedge.copy());
+        return cell;
+    }
 }
 
 class Halfedge {
@@ -42,6 +48,10 @@ class Halfedge {
 
     getEndpoint() {
         return this.edge.lSite === this.site ? this.edge.vb : this.edge.va;
+    }
+
+    copy() {
+        return new Halfedge(this.edge?.copy(), this.site?.copy(), this.edge?.rSite?.copy());
     }
 }
 
@@ -70,7 +80,7 @@ class Edge {
     }
 
     copy() {
-        return new Edge(this.lSite.copy(), this.rSite.copy(), this.va.copy(), this.vb.copy());
+        return new Edge(this.lSite?.copy(), this.rSite?.copy(), this.va?.copy(), this.vb?.copy());
     }
 
 }
@@ -82,13 +92,14 @@ class Diagram {
 }
 
 class Vertex {
-    constructor(x, y) {
+    constructor(x, y, voronoiId = -1) {
         this.x = x;
         this.y = y;
+        this.voronoiId = voronoiId;
     }
 
     copy() {
-        return new Vertex(this.x, this.y);
+        return new Vertex(this.x, this.y, this.voronoiId);
     }
 }
 
@@ -712,6 +723,8 @@ class Voronoi {
         // reset internal state
         this.reset();
 
+        sites = sites.map(site => new Vertex(site.x, site.y));
+
         // initialize site event queue (sorted top-to-bottom, left-to-right)
         const siteEvents = sites.slice(0);
         siteEvents.sort((a, b) => {
@@ -769,9 +782,7 @@ class Voronoi {
 
         // create and populate the result diagram
         const diagram = new Diagram();
-        diagram.cells = this.cells;
-        diagram.edges = this.edges;
-        diagram.vertices = this.vertices;
+        diagram.edges = this.edges.map(edge => edge.copy());
         diagram.i = step_i;
 
         // clean up internal state
@@ -784,6 +795,9 @@ class Voronoi {
     computeStepByStep(sites, bbox, step) {
         // init internal state
         this.reset();
+
+
+        sites = sites.map(site => new Vertex(site.x, site.y));
 
         // Initialize site event queue
         var siteEvents = sites.slice(0);
@@ -849,16 +863,12 @@ class Voronoi {
         //   add missing edges in order to close opened cells
         this.closeCells(bbox);
 
-        // to measure execution time
-        var stopTime = new Date();
-
         // prepare return values
         var diagram = new Diagram();
-        diagram.cells = this.cells;
-        diagram.edges = this.edges;
+        diagram.edges = this.edges.map(edge => {return edge.copy();});
         diagram.vertices = this.vertices;
         diagram.i = i;
-        diagram.beachline = site; // this.getBeachline()?.map(arc => arc?.site).sort((a, b) => b.y - a.y).at(0);
+        diagram.beachline = site;
         if (diagram.beachline) {
             diagram.beachlineArcs = this.getBeachlineArcs(diagram.beachline);
             diagram.circleEvents = this.getActiveCircleEvents();
