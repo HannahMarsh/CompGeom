@@ -124,7 +124,7 @@ th {
     background-color: #faecff;
 }
 
-button {
+button:not(.pause-play-skip) {
     background-color: #af4ca0;
     color: white;
     padding: 8px 12px;
@@ -135,15 +135,34 @@ button {
     transition: background-color 0.3s;
 }
 
+button.pause-play-skip {
+    background-color: #f7ebff;;
+    color: #af4ca0;
+    border: none;
+    font-size: 1.7em;
+}
+
+button.pause-play-skip:disabled {
+    background-color: #f7ebff;;
+    color: #c9b2ca;
+    cursor: not-allowed;
+}
+
+.pause-play-skip-container {
+    margin-top: 1vh;
+    background-color: #f7ebff;
+    padding: 5px;
+}
+
 #visualize-fortune-button:enabled {
     background-color: #a05fcb;
 }
 
-button:hover {
+button:not(.pause-play-skip):hover {
     background-color: #a05fcb;
 }
 
-button:disabled {
+button:not(.pause-play-skip):disabled {
     background-color: #c9b2ca;
     cursor: not-allowed;
 }
@@ -260,6 +279,38 @@ button:disabled {
     margin-left: 10px;
     color: #333;
 }
+
+
+
+/* Style the slider track when disabled */
+#speed-slider:disabled {
+    background: #ccc; /* Greyed-out track */
+    cursor: not-allowed; /* Show a "not allowed" cursor */
+    opacity: 0.6; /* Slightly transparent */
+}
+
+/* Style the slider thumb (Webkit) when disabled */
+#speed-slider:disabled::-webkit-slider-thumb {
+    background: #c9b2ca; /* Light grey thumb */
+    cursor: not-allowed;
+}
+
+/* Style the slider thumb (Firefox) when disabled */
+#speed-slider:disabled::-moz-range-thumb {
+    background: #c9b2ca; /* Light grey thumb */
+    cursor: not-allowed;
+}
+
+/* Optional: Disable hover effects when the slider is disabled */
+#speed-slider:disabled:hover {
+    background: #ccc;
+}
+
+#speed-slider:disabled::-webkit-slider-thumb:hover,
+#speed-slider:disabled::-moz-range-thumb:hover {
+    background: #c9b2ca;
+}
+
 
 
 

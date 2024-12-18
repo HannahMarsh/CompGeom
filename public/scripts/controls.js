@@ -242,13 +242,14 @@ function updateAutoPlayPauseButton() {
     if (canvasWrapper.IsInAlgorithm()) {
         enableButton(autoPlayButton);
         if (canvasWrapper.isAutoPlaying) {
-            autoPlayButton.innerText = "Pause";
+            autoPlayButton.innerHTML = "<i class=\"fa-regular fa-circle-pause\"></i>";
         } else {
-            autoPlayButton.innerText = "Auto-play";
+            autoPlayButton.innerHTML = "<i class=\"fa-regular fa-circle-play\"></i>";
         }
     } else {
         disableButton(autoPlayButton);
-        autoPlayButton.innerText = "Auto-play";
+        autoPlayButton.innerHTML = "<i class=\"fa-regular fa-circle-play\"></i>";
+
     }
 }
 
@@ -284,6 +285,14 @@ function updateClearButton() {
 }
 
 function updateSpeedButtons() {
+    if (!canvasWrapper.IsInAlgorithm()) {
+        disableButton(speedUpButton);
+        disableButton(slowDownButton);
+        document.getElementById("speed-slider").disabled = true;
+        return;
+    } else {
+        document.getElementById("speed-slider").disabled = false;
+    }
     if (currentSpeed === 1) {
         disableButton(slowDownButton);
         enableButton(speedUpButton);
