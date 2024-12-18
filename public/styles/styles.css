@@ -111,7 +111,7 @@ table {
 }
 
 table, th, td {
-    border: 1px solid black;
+    /*border: 1px solid black;*/
     padding: 8px;
     text-align: center;
 }
@@ -121,7 +121,7 @@ table, th, td {
 }
 
 th {
-    background-color: #faecff;
+    background-color: #f7ebff;
 }
 
 button:not(.pause-play-skip) {
@@ -136,10 +136,16 @@ button:not(.pause-play-skip) {
 }
 
 button.pause-play-skip {
-    background-color: #f7ebff;;
+    background-color: #f7ebff;
     color: #af4ca0;
+
     border: none;
-    font-size: 1.7em;
+    border-radius: 4px;
+    padding-top: 0.1em;
+    padding-bottom: 0.1em;
+    font-size: 1.8em;
+    /*margin-top: 5vh;*/
+    /*margin-bottom: 5vh; !* Centers vertically in remaining space *!*/
 }
 
 button.pause-play-skip:disabled {
@@ -148,11 +154,61 @@ button.pause-play-skip:disabled {
     cursor: not-allowed;
 }
 
+
+
 .pause-play-skip-container {
     margin-top: 1vh;
     background-color: #f7ebff;
-    padding: 5px;
+    border: none;
+    border-radius: 6px;
+    /*box-shadow: inset 0 0 15px rgba(0, 0, 0, 0.1);*/
+    padding: 15px;
+    display: flex; /* Flexbox layout */
+    flex-direction: row; /* Arrange items horizontally */
+    justify-content: center; /* Center horizontally */
+    align-items: flex-end; /* Center vertically */
+    /*height: 5em;*/
 }
+
+.pause-play-skip-bound {
+    display: flex;
+    flex-direction: column; /* Arrange items horizontally */
+    justify-content: center;
+    height: 100%;
+    width: 3.1em;
+}
+
+.pause-play-skip-bound#pause-play-skip-bound-auto-play {
+    width: 3.5em;
+}
+
+.pause-play-skip-bound#pause-play-skip-bound-auto-play > button.pause-play-skip {
+    font-size: 2em;
+}
+
+
+button.pause-play-skip:not(:disabled):hover {
+    background-color: #af4ca0;
+    color: #f7ebff;
+}
+
+.pause-play-skip-label {
+    color: #af4ca0;
+    font-size: 0.7em;
+    font-weight: bold;
+    line-height: 0.9em;
+    letter-spacing: 0.03em;
+    margin-top: 7px;
+}
+
+button.pause-play-skip:disabled + .pause-play-skip-label {
+    color: #c9b2ca;
+    cursor: not-allowed;
+}
+
+/*#auto-play-button {*/
+/*    font-size: 2em;*/
+/*}*/
 
 #visualize-fortune-button:enabled {
     background-color: #a05fcb;

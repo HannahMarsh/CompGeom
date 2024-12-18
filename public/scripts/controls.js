@@ -48,7 +48,6 @@ autoPlayButton.addEventListener("click", () => {
     if (canvasWrapper.inAlgorithm) {
         if (!canvasWrapper.isAutoPlaying) {
             console.log("Auto-play started");
-            autoPlayButton.innerText = "Pause";
             canvasWrapper.NextTransition(true, true);
             updateAll();
         } else {
@@ -60,6 +59,7 @@ autoPlayButton.addEventListener("click", () => {
         throw new Error("Auto-play button clicked while not in algorithm. Should have been disabled.");
     }
 });
+
 
 nextButton.addEventListener("click", () => {
     console.log("Next.");
@@ -239,16 +239,21 @@ function updateBackAndSkipBackButtons() {
 }
 
 function updateAutoPlayPauseButton() {
+    let play = "<i class=\"fa-solid fa-play\"></i>";
+    let pause = "<i class=\"fa-solid fa-pause\"></i>";
     if (canvasWrapper.IsInAlgorithm()) {
         enableButton(autoPlayButton);
         if (canvasWrapper.isAutoPlaying) {
-            autoPlayButton.innerHTML = "<i class=\"fa-regular fa-circle-pause\"></i>";
+            autoPlayButton.innerHTML = pause;
+            document.getElementById("auto-play-label").innerHTML = "Pause<br>&nbsp;";
         } else {
-            autoPlayButton.innerHTML = "<i class=\"fa-regular fa-circle-play\"></i>";
+            autoPlayButton.innerHTML = play;
+            document.getElementById("auto-play-label").innerHTML = "Auto<br>Play";
         }
     } else {
         disableButton(autoPlayButton);
-        autoPlayButton.innerHTML = "<i class=\"fa-regular fa-circle-play\"></i>";
+        autoPlayButton.innerHTML = play;
+        document.getElementById("auto-play-label").innerHTML = "Auto<br>Play";
 
     }
 }
