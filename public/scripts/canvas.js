@@ -42,6 +42,7 @@ class Canvas {
 
   SetStep(step) {
     this.step = step;
+    this.UpdateStep();
     updateAll();
   }
 
@@ -590,7 +591,7 @@ class Canvas {
 
 
     this.SetStep(currentStep);
-    this.UpdateStep();
+
 
     if (autoPlay || (smooth && this.smoothTransitions)) {
 
@@ -638,7 +639,11 @@ class Canvas {
   }
 
   UpdateStep() {
-    document.getElementById("i-num").innerText = `${Math.round(this.step)}`;
+    if (this.step >= 0) {
+      document.getElementById("i-num").innerText = `${Math.round(this.step) + 1} of ${this.numSteps + 1}`;
+    } else {
+        document.getElementById("i-num").innerText = "";
+    }
     this.UpdateArcs();
     this.UpdateEdges();
   }
