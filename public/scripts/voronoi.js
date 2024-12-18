@@ -822,8 +822,14 @@ class Voronoi {
 
             // process site event (if it's earlier than the circle event)
             if (site && (!circle || site.y < circle.y || (site.y === circle.y && site.x < circle.x))) {
+                let description = `Step ${step_i}: Processing site event at (${Math.round(site.x)}, ${Math.round(site.y)}).\n`;
+
+
                 // add a beach section only if the site is not a duplicate
                 if (site.x !== xsitex || site.y !== xsitey) {
+
+                    description += `Added beach section for this site.`;
+
                     // create a cell for the new site
                     cells[siteid] = new Cell(site);
                     site.voronoiId = siteid++;
@@ -834,6 +840,8 @@ class Voronoi {
                     // update last site coordinates to detect duplicates
                     xsitey = site.y;
                     xsitex = site.x;
+                } else {
+                    description += `: Duplicate site, ignored.`;
                 }
 
                 results.push({
@@ -841,6 +849,7 @@ class Voronoi {
                     sweepLine: site.y,
                     circles: this.getActiveCircleEvents(),
                     edges: this.edges.map(edge => edge.copy()),
+                    description: description,
                 });
 
                 lastSite = site;
@@ -848,12 +857,19 @@ class Voronoi {
                 // move to the next site in the queue
                 site = siteEvents.pop();
             } else if (circle) { // process circle event (remove collapsing beach section)
+                let description = `Step ${step_i}: Circle event detected at (${circle.x.toFixed(2)}, ${circle.y.toFixed(2)}).\n`;
+                description += `Removed collapsing beach section associated with site (${circle.arc.site.x.toFixed(2)}, ${circle.arc.site.y.toFixed(2)}).`;
+
+                // let description = `Processing circle event at (${circle.x.toFixed(2)}, ${circle.y.toFixed(2)})`;
+                // description += `: Removed beach section for arc ${circle.arc.site.voronoiId}`;
+
                 this.removeBeachsection(circle.arc);
                 results.push({
                     step: step_i,
                     sweepLine: site? site.y : lastSite.y,
                     circles: this.getActiveCircleEvents(),
                     edges: this.edges.map(edge => edge.copy()),
+                    description: description,
                 });
 
             } else { // no more events to process
@@ -876,46 +892,134 @@ class Voronoi {
             sweepLine: lastSite.y,
             circles: this.getActiveCircleEvents(),
             edges: this.edges.map(edge => edge.copy()),
+            description: `Final step: Edges clipped and cells closed.`
         });
 
-
-        let rr = Object.entries(results.reduce((groups, item) => {
-            const key = item.sweepLine; // group by 'sweepLine'
-            if (!groups[key]) {
-                groups[key] = []; // initialize group if not present
-            }
-            groups[key].push(item); // add current item to the group
-            return groups;
-        }, {})).map((group, i) => {
-
-            return {
-                sweepLine: group[1][0].sweepLine,
-                steps: group[1],
-            };
-        });
-
-        // clean up internal state
-        this.reset();
-
-        rr.forEach((r, i) => {
-            //if (r.step !== step_i) {
-                let steps = this.computeStepByStep(sites, bbox, Math.max(...r.steps.map(s => s.step))).edges;
-                r.steps.forEach((step, j) => {
-                    step.edges = this.computeStepByStep(sites, bbox, step.step).edges;
-                });
-            //}
-            // } else {
-            //     let finalEdges = this.compute(sites, bbox).edges;
-            //     r.steps.forEach((step, j) => {
-            //         step.edges = finalEdges;
-            //     });
-            // }
+        results.forEach((r) => {
+            r.edges = this.computeStepByStep(sites, bbox, step.step).edges;
         });
 
 
 
         return rr; // return the final Voronoi diagram
     }
+
+    computeAllSteps(sites, bbox) {
+        let step = -1;
+        let results = [];
+        let result;
+
+        do {
+            step++;
+            result = this.computeStep(sites, bbox, step);
+            results.push(result);
+        } while (!result.done);
+
+        return results;
+    }
+
+    computeStep(sites, bbox, step) {
+        // reset internal state
+        this.reset();
+
+        const siteEvents = sites.map(site => new Vertex(site.x, site.y)).slice(0);
+
+        siteEvents.sort((a, b) => {
+            const diffY = b.y - a.y; // sort by descending y-coordinate
+            return diffY || (b.x - a.x); // tie-breaker: descending x-coordinate
+        });
+
+        let site = siteEvents.pop(); // get the first site (bottom-most)
+        let siteid = 0; // unique id for each site
+        let xsitex, xsitey; // to track duplicate site coordinates
+        let cells = this.cells; // store cells created for each site
+        let step_i = -1; // iteration step count for debugging/tracking
+        let lastSite = site;
+
+        let sweepLine = -1;
+        let circles = [];
+        let description = '';
+        let done = false;
+
+
+        // process site and circle events
+        while (step_i < step) {
+
+            // get the first circle event (smallest in the queue)
+            let circle = this.firstCircleEvent;
+
+            // process site event (if it's earlier than the circle event)
+            if (site && (!circle || site.y < circle.y || (site.y === circle.y && site.x < circle.x))) {
+
+
+                // add a beach section only if the site is not a duplicate
+                if (site.x !== xsitex || site.y !== xsitey) {
+
+
+                    description = `Step ${step_i}: Processing site event at (${Math.round(site.x)}, ${Math.round(site.y)}).\n`;
+                    description += `Added beach section for this site.`;
+
+                    // create a cell for the new site
+                    cells[siteid] = new Cell(site);
+                    site.voronoiId = siteid++;
+
+                    // create a beach section for the site
+                    this.addBeachsection(site);
+
+                    // update last site coordinates to detect duplicates
+                    xsitey = site.y;
+                    xsitex = site.x;
+
+
+                    sweepLine = site.y;
+                    circles = this.getActiveCircleEvents();
+                    step_i++;
+                }
+
+                lastSite = site;
+
+                // move to the next site in the queue
+                site = siteEvents.pop();
+            } else if (circle) { // process circle event (remove collapsing beach section)
+                this.removeBeachsection(circle.arc);
+                sweepLine = site? site.y : lastSite.y;
+                circles = this.getActiveCircleEvents();
+                description = `Step ${step_i}: Circle event detected at (${circle.x.toFixed(2)}, ${circle.y.toFixed(2)}).\n`;
+                description += `Removed collapsing beach section associated with site (${circle.arc.site.x.toFixed(2)}, ${circle.arc.site.y.toFixed(2)}).`;
+
+                step_i++;
+            } else { // no more events to process
+                done = true;
+                break;
+            }
+        }
+
+        // post-processing:
+        // 1. connect dangling edges to the bounding box
+        // 2. clip edges to fit within the bounding box
+        // 3. discard edges completely outside the bounding box
+        // 4. remove edges that are reduced to points
+        this.clipEdges(bbox);
+
+        // close open cells by adding missing edges
+        this.closeCells(bbox);
+
+
+        let result = {
+            step: step_i,
+            sweepLine: sweepLine,
+            circles: circles,
+            edges: this.edges.map(edge => edge.copy()),
+            description: !done ? description : `Final step: Edges clipped and cells closed.`,
+            done: done,
+        };
+
+
+        this.reset();
+
+        return result;
+    }
+
 
 
     computeStepByStep(sites, bbox, step) {

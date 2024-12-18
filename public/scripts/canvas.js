@@ -32,23 +32,29 @@ class Canvas {
       this.interruptedAnimation = true;
     }
     this.DrawCurrentState();
-    updateAll();
+    this.updateAll();
   }
 
   SetIsAutoPlaying(isAutoPlaying) {
     this.isAutoPlaying = isAutoPlaying;
-    updateAll();
+    this.updateAll();
   }
 
   SetStep(step) {
     this.step = step;
     this.UpdateStep();
-    updateAll();
+    this.updateAll();
   }
 
 
   SetUpdateAllFunction(updateAllFunction) {
-    this.updateAll = updateAllFunction;
+    this.updateAll = () => {
+      updateAllFunction();
+      this.UpdateTable();
+      if (!this.inAlgorithm) {
+        this.UpdateDescription();
+      }
+    }
   }
 
   eqEps(a, b) {
@@ -64,18 +70,9 @@ class Canvas {
     return b - a > 1e-9;
   }
 
-  Width() {
-    return this.canvas.width;
-  }
-
-  Height() {
-    return this.canvas.height;
-  }
-
-
   HandleResize() {
-    const oldWidth = this.Width();
-    const oldHeight = this.Height();
+    const oldWidth = this.canvas.width;
+    const oldHeight = this.canvas.height;
     const newWidth = this.canvas.clientWidth
     const newHeight = this.canvas.clientHeight
 
@@ -89,6 +86,7 @@ class Canvas {
         point.x = point.x * wScale;
         point.y = point.y * hScale;
       });
+      this.
       this.DrawCurrentState()
     }
 
@@ -103,7 +101,7 @@ class Canvas {
   }
 
   ClearCanvas() {
-    this.ctx.clearRect(0, 0, this.Width(), this.Height());
+    this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
   }
 
   ClearAllPoints() {
@@ -112,7 +110,7 @@ class Canvas {
     this.ComputeVoronoi()
     this.DrawCurrentState();
     this.UpdateTable();
-    updateAll();
+    this.updateAll();
   }
 
   AddPoint(x, y, redraw = true) {
@@ -120,7 +118,7 @@ class Canvas {
     if (!point) {
       this.points.push({ x, y });
       this.UpdateTable();
-      updateAll();
+      this.updateAll();
       console.log(`Added point at (${x}, ${y}).`);
       if (redraw) {
         this.ComputeVoronoi();
@@ -221,8 +219,8 @@ class Canvas {
           this.AddPoint(p.x, p.y, false);
       } else {
         while (true) {
-          const x = Math.random() * this.Width();
-          const y = Math.random() * this.Height();
+          const x = Math.random() * this.canvas.width;
+          const y = Math.random() * this.canvas.height;
           if (this.AddPoint(x, y, true)) {
             break;
           }
@@ -237,25 +235,28 @@ class Canvas {
     this.results.length = 0;
     this.finalResult = null;
     this.numSteps = 0;
+    this.SetStep(-1);
     if (this.points.length > 1) {
       console.log("Computing Voronoi diagram.")
 
 
-      this.results = this.voronoi.compute2(this.points, this.bbox);
-      this.steps = this.results.flatMap(result => result.steps);
+      this.steps = this.voronoi.computeAllSteps(this.points, this.bbox);
       this.steps.sort((a, b) => a.step - b.step);
       this.numSteps = Math.max(...this.steps.map(step => step.step)) + 1;
       this.steps.unshift({
         step: -1,
         sweepLine: Math.min(this.bbox.yt, this.bbox.yb),
-        circleEvents: [],
+        circles: [],
         edges: [],
+        description: "Initial start of the algorithm.",
       });
+      let lastStep = this.steps[this.steps.length - 1];
       this.steps.push({
         step: this.numSteps,
         sweepLine: Math.max(this.bbox.yt, this.bbox.yb),
-        circleEvents: [],
-        edges: this.steps[this.steps.length - 1].edges,
+        circles: [],
+        edges: lastStep.edges,
+        description: "Final state of the algorithm.",
       });
 
       this.finalResult = this.steps[this.steps.length - 1];
@@ -294,7 +295,6 @@ class Canvas {
   ToggleSmoothTransitions() {
     this.smoothTransitions = !this.smoothTransitions;
   }
-
 
   IsInAlgorithm() {
     return this.inAlgorithm;
@@ -360,7 +360,7 @@ class Canvas {
     if (y) {
       this.ctx.beginPath();
       this.ctx.moveTo(0, y);
-      this.ctx.lineTo(this.Width(), y);
+      this.ctx.lineTo(this.canvas.width, y);
       this.ctx.strokeStyle = color;
       this.ctx.lineWidth = 2;
       this.ctx.stroke();
@@ -545,9 +545,13 @@ class Canvas {
     tableBody.innerHTML = "";
     this.points.sort((a, b) => {return a.y - b.y}).forEach((point, index) => {
       const row = document.createElement("tr");
-      row.innerHTML = `<td>${index + 1}</td><td>${Math.round(point.x)}</td><td>${Math.round(point.y)}</td>`;
+      let sl = (this.inAlgorithm && this.points.length > 1 && this.step >= 0 && this.GetCurrentResult()) ? this.GetCurrentResult().sweepLine : Infinity;
+      let color = point.y < sl ? "blue" : this.eqEps(point.y, sl) ? "red" : "black";
+      let colorText = (text) => `<span style="color: ${color};">${text}</span>`;
+      row.innerHTML = `<td>${colorText(index + 1)}</td><td>${colorText(Math.round(point.x))}</td><td>${colorText(Math.round(point.y))}</td>`;
       tableBody.appendChild(row);
     });
+    document.getElementById("n").innerText = `${this.points.length}`;
   }
 
   Transition(smooth = true, previous = false, autoPlay = false) {
@@ -591,6 +595,7 @@ class Canvas {
 
 
     this.SetStep(currentStep);
+    this.UpdateDescription(currentResult.description ?? "");
 
 
     if (autoPlay || (smooth && this.smoothTransitions)) {
@@ -661,6 +666,9 @@ class Canvas {
     document.getElementById("edges").innerText = `${numEdges}`;
   }
 
+  UpdateDescription(description = "Click \"Start\" to visualise Fortune's sweep line algorithm.") {
+    document.getElementById("step-description").innerText = description;
+  }
 
   AnimateSweeplineAndBeachlines(valuesOfI, index, autoPlay) {
     if (this.interruptedAnimation) {

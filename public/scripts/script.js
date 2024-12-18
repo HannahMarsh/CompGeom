@@ -6,7 +6,7 @@ let draggingPoint = null;
 canvasWrapper.SetUpdateAllFunction(updateAll);
 
 
-window.addEventListener("resize", canvasWrapper.HandleResize);
+window.addEventListener("resize", () => canvasWrapper.HandleResize());
 
 
 // Add point on click

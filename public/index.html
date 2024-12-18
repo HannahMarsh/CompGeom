@@ -14,6 +14,7 @@
     <link rel="apple-touch-icon" href="favicon_io/apple-touch-icon.png">
     <link rel="shortcut icon" href="favicon_io/favicon.ico">
     <link rel="manifest" href="favicon_io/site.webmanifest">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
 </head>
 <body>
     <div class="top-info">Computational Geometry (COMP 193), <em>Tufts University</em>, Fall 2024<br>Final Project, 12/18/24<br><b>Hannah Marsh</b> (<em>hmarsh03@cs.tufts.edu</em>)</div>
@@ -23,6 +24,10 @@
         
         <div class="canvas-table">
             <h2>Canvas</h2>
+
+            <button id="clear-button"><i class="fa-solid fa-trash-can"></i> Clear All Points</button>
+            <button id="add-random-button"><i class="fa-solid fa-circle-plus"></i> Add Random Point</button>
+            <button id="add-5-random-button"><i class="fa-solid fa-circle-plus"></i> Add 5 Random Points</button>
             <h3>Click anywhere in the canvas to add a point, or drag existing points to a new position.</h3>
             <div class="canvas-container">
                 <canvas id="main-canvas"></canvas>
@@ -40,20 +45,20 @@
 
                 <button id="start-button" disabled>Start</button>
                 <div>
-                    <button id="auto-play-button" disabled>Auto-play</button>
-                    <button id="skip-back-button" disabled><<</button>
-                    <button id="back-button" disabled><</button>
-                    <button id="next-button" disabled>></button>
-                    <button id="skip-ahead-button" disabled>>></button>
+                    <button id="auto-play-button" title="Automatically play the algorithm from start to finish" disabled>Auto-play</button>
+                    <button id="skip-back-button" disabled><i class="fas fa-backward-fast"></i></button>
+                    <button id="back-button" style="font-size: 1em;" disabled><i class="fa-solid fa-backward-step"></i></button>
+                    <button id="next-button" style="font-size: 1em;" disabled><i class="fas fa-forward-step"></i></button>
+                    <button id="skip-ahead-button" disabled><i class="fas fa-forward-fast"></i></button>
                 </div>
 
 
         
                 <h3 style="text-align: left;">Speed Options:</h3>
 
-                <button id="slow-down">Slow down</button>
+                <button id="slow-down" title="Slow down animation">Slow down</button>
 
-                <button id="speed-up">Speed Up</button>
+                <button id="speed-up" title="Speed up animation">Speed Up</button>
 <!--                <div class="speed-control">-->
 <!--                    <label class="slider-label" for="speed-slider">Speed:</label>-->
 <!--                    <input type="range" id="speed-slider" min="1" max="9" value="5" step="1">-->
@@ -113,15 +118,12 @@
                 </table>
             </div>
             <div class="description-panel">
-                <h3>Algorithm Step Description</h3>
+                <h3>Algorithm Event Log</h3>
                 <p id="step-description">Click "Start" to visualise Fortune's sweep line algorithm.</p>
             </div>
         </div>
         <div class="table-container">
             <h2>Point Coordinates</h2>
-            <button id="clear-button">Clear All Points</button>
-            <button id="add-random-button">Add Random Point</button>
-            <button id="add-5-random-button">Add 5 Random Points</button>
             <table id="points-table">
                 <thead>
                     <tr>
