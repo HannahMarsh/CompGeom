@@ -3,6 +3,9 @@ const canvasWrapper = new Canvas(canvas);
 let draggingPoint = null;
 
 
+canvasWrapper.SetUpdateAllFunction(updateAll);
+
+
 window.addEventListener("resize", canvasWrapper.HandleResize);
 
 
@@ -52,136 +55,12 @@ canvas.addEventListener("mouseup", () => {
     draggingPoint = null;
 });
 
-function disableButton(buttonId) {
-    document.getElementById(buttonId).disabled = true;
-}
-
-function enableButton(buttonId) {
-    document.getElementById(buttonId).disabled = false;
-}
-
 document.addEventListener("DOMContentLoaded", () => {
     canvasWrapper.AddRandomPoints(10);
+    updateAll();
 });
 
 
-// Event listeners for buttons
-document.getElementById("clear-button").addEventListener("click", () => {
-    console.log("Clear button clicked.");
-    canvasWrapper.ClearAllPoints();
-});
 
-document.getElementById("add-random-button").addEventListener("click", () => {
-    console.log("Add random point button clicked.");
-    canvasWrapper.AddRandomPoint()
-});
-
-// let started = false;
-
-document.getElementById("visualize-fortune-button").addEventListener("click", () => {
-    if (!canvasWrapper.IsInAlgorithm()) {
-        console.log("Algorithm started");
-        document.getElementById("visualize-fortune-button").innerText = "Exit";
-        enableButton("next-button");
-        enableButton("fast-forward-button");
-        isPaused = true;
-        document.getElementById("pause-button").innerText = "Auto-play";
-        enableButton("pause-button");
-        canvasWrapper.ToggleInAlgorithm();
-        canvasWrapper.NextTransition();
-    } else {
-        console.log("Algorithm stopped");
-        document.getElementById("visualize-fortune-button").innerText = "Start";
-        disableButton("next-button");
-        disableButton("fast-forward-button");
-        document.getElementById("pause-button").innerText = "Auto-play";
-        disableButton("pause-button");
-        isPaused = true;
-        canvasWrapper.ToggleInAlgorithm();
-    }
-});
-
-let isPaused = true;
-
-document.getElementById("pause-button").addEventListener("click", () => {
-    if (isPaused) {
-        isPaused = false;
-        document.getElementById("pause-button").innerText = "Pause";
-        canvasWrapper.NextTransition(true, true);
-        console.log("Unpaused.");
-        disableButton("back-button");
-        disableButton("next-button");
-        disableButton("fast-forward-button");
-        disableButton("visualize-fortune-button");
-    } else {
-        isPaused = true;
-        document.getElementById("pause-button").innerText = "Auto-play";
-        console.log("Paused.");
-        canvasWrapper.PauseAutoPlay();
-
-        enableButton("back-button");
-        enableButton("next-button");
-        enableButton("fast-forward-button");
-        enableButton("visualize-fortune-button");
-    }
-});
-
-document.getElementById("fast-forward-button").addEventListener("click", () => {
-    console.log("Fast forward.");
-    canvasWrapper.SkipTransition(3);
-});
-
-document.getElementById("next-button").addEventListener("click", () => {
-    console.log("Next.");
-    enableButton("back-button");
-    canvasWrapper.NextTransition(true);
-});
-
-document.getElementById("back-button").addEventListener("click", () => {
-    console.log("Back.");
-    canvasWrapper.PreviousTransition(true);
-
-});
-
-document.getElementById("show-beachline").addEventListener("change", (event) => {
-    console.log("Show beachline.");
-    canvasWrapper.ToggleShowBeachline();
-});
-
-document.getElementById("show-circle-events").addEventListener("change", (event) => {
-    console.log("Show circles.");
-    canvasWrapper.ToggleShowCircles();
-});
-
-document.getElementById("smooth-transition").addEventListener("change", (event) => {
-    console.log("Show circles.");
-    canvasWrapper.ToggleSmoothTransitions()
-});
-
-// Speed mapping
-const speedMap = {
-    1: 0.2,
-    2: 0.3,
-    3: 0.5,
-    4: 0.75,
-    5: 1,
-    6: 1.5,
-    7: 2,
-    8: 2.5,
-    9: 3
-};
-
-let animationSpeed = speedMap[5]; // Default speed for value 5
-const speedSlider = document.getElementById("speed-slider");
-const speedDisplay = document.getElementById("speed-display");
-
-// Event listener to update speed
-speedSlider.addEventListener("input", () => {
-    const sliderValue = parseInt(speedSlider.value, 10);
-    animationSpeed = speedMap[sliderValue];
-    speedDisplay.textContent = `${animationSpeed}x`;
-    console.log(`Current animation speed: ${animationSpeed}x`);
-    canvasWrapper.UpdateSpeed(animationSpeed);
-});
 
 

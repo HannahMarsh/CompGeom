@@ -37,20 +37,45 @@
             <div class="controls">
                 <h2>Algorithm Controls</h2>
                 <p id="add-points"><em>Add points to the canvas before starting algorithm.</em></p>
-                <button id="visualize-fortune-button" disabled>Start</button>
-                <button id="pause-button" disabled>Auto-play</button>
-                <button id="next-button" disabled>Next</button>
-                <button id="back-button" disabled>Back</button>
-                <button id="fast-forward-button" disabled>Fast Forward</button>
+
+                <button id="start-button" disabled>Start</button>
+                <div>
+                    <button id="auto-play-button" disabled>Auto-play</button>
+                    <button id="skip-back-button" disabled><<</button>
+                    <button id="back-button" disabled><</button>
+                    <button id="next-button" disabled>></button>
+                    <button id="skip-ahead-button" disabled>>></button>
+                </div>
 
 
         
-                <h3 style="text-align: left;">Options</h3>
+                <h3 style="text-align: left;">Speed Options:</h3>
+
+                <button id="slow-down">Slow down</button>
+
+                <button id="speed-up">Speed Up</button>
+<!--                <div class="speed-control">-->
+<!--                    <label class="slider-label" for="speed-slider">Speed:</label>-->
+<!--                    <input type="range" id="speed-slider" min="1" max="9" value="5" step="1">-->
+<!--                    <span id="speed-display">1x</span>-->
+<!--                </div>-->
                 <div class="speed-control">
-                    <label class="slider-label" for="speed-slider">Speed:</label>
-                    <input type="range" id="speed-slider" min="1" max="9" value="5" step="1">
-                    <span id="speed-display">1x</span>
+                    <input type="range" id="speed-slider" min="1" max="9" value="5" step="1" list="speed-ticks">
+                    <datalist id="speed-ticks">
+                        <option value="1" label="0.2x"></option>
+                        <option value="2" label="0.3x"></option>
+                        <option value="3" label="0.5x"></option>
+                        <option value="4" label="0.75x"></option>
+                        <option value="5" label="1x"></option>
+                        <option value="6" label="1.5x"></option>
+                        <option value="7" label="2x"></option>
+                        <option value="8" label="2.5x"></option>
+                        <option value="9" label="3x"></option>
+                    </datalist>
                 </div>
+
+                <h3 style="text-align: left;">Display Options:</h3>
+
                 <label>
                     <input type="checkbox" id="show-beachline" checked/> Show Beach Line
                 </label>
@@ -96,6 +121,7 @@
             <h2>Point Coordinates</h2>
             <button id="clear-button">Clear All Points</button>
             <button id="add-random-button">Add Random Point</button>
+            <button id="add-5-random-button">Add 5 Random Points</button>
             <table id="points-table">
                 <thead>
                     <tr>
@@ -119,6 +145,7 @@
     <script src="scripts/util/RedBlackTree.js"></script>
     <script src="scripts/voronoi.js"></script>
     <script src="scripts/canvas.js"></script>
+    <script src="scripts/controls.js"></script>
     <script src="scripts/script.js"></script>
 
 </body>

@@ -22,6 +22,32 @@ class Canvas {
     this.smoothTransitions = true;
     this.animationSpeed = 1000;
     this.interruptedAnimation = false;
+    this.isAutoPlaying = false;
+  }
+
+  SetIsInAlgorithm(isInAlgorithm) {
+    this.inAlgorithm = isInAlgorithm;
+    this.SetStep(-1);
+    if (this.isAutoPlaying) {
+      this.interruptedAnimation = true;
+    }
+    this.DrawCurrentState();
+    updateAll();
+  }
+
+  SetIsAutoPlaying(isAutoPlaying) {
+    this.isAutoPlaying = isAutoPlaying;
+    updateAll();
+  }
+
+  SetStep(step) {
+    this.step = step;
+    updateAll();
+  }
+
+
+  SetUpdateAllFunction(updateAllFunction) {
+    this.updateAll = updateAllFunction;
   }
 
   eqEps(a, b) {
@@ -81,10 +107,11 @@ class Canvas {
 
   ClearAllPoints() {
     this.points.length = 0;
-    this.inAlgorithm = false;
-    this.step = -1;
+    this.SetIsInAlgorithm(false);
     this.ComputeVoronoi()
     this.DrawCurrentState();
+    this.UpdateTable();
+    updateAll();
   }
 
   AddPoint(x, y, redraw = true) {
@@ -92,17 +119,11 @@ class Canvas {
     if (!point) {
       this.points.push({ x, y });
       this.UpdateTable();
+      updateAll();
       console.log(`Added point at (${x}, ${y}).`);
       if (redraw) {
-        if (this.points.length > 1 && this.step === this.results.length - 1) {
-          this.initialized = false;
-        }
-        this.initialized = false;
         this.ComputeVoronoi();
         this.DrawCurrentState();
-      }
-      if (this.points.length === 1) {
-        document.getElementById("visualize-fortune-button").disabled = false;
       }
       return true;
     } else {
@@ -134,13 +155,76 @@ class Canvas {
     this.AddRandomPoints(1);
   }
 
+  findFurthestPoint() {
+    let { xl, xr, yt, yb } = this.bbox;
+
+    if (xr < xl) {
+      [xl, xr] = [xl, xr];
+    }
+    if (yb < yt) {
+      [yt, yb] = [yb, yt];
+    }
+
+    const xShift = Math.abs((xr - xl) / 10);
+    const yShift = Math.abs((yb - yt) / 10);
+
+    xl += xShift;
+    xr -= xShift;
+    yt += yShift;
+    yb -= yShift;
+
+
+    const stepSizeX = Math.abs((xr - xl) / 15);
+    const stepSizeY = Math.abs((yb - yt) / 20);
+
+
+    let bestPoint = null;
+    let maxMinDistance = -Infinity;
+
+    // Helper function to compute Euclidean distance
+    const distance = (x1, y1, x2, y2) => Math.sqrt((x1 - x2) ** 2 + (y1 - y2) ** 2);
+
+    // Iterate over grid points inside the bbox
+    for (let x = xl; x <= xr; x += stepSizeX) {
+      for (let y = yt; y <= yb; y += stepSizeY) {
+        let minDistance = Infinity;
+
+        // Find the minimum distance from this candidate point to all other points
+        for (const point of this.points) {
+          const dist = distance(x, y, point.x, point.y);
+          if (dist < minDistance) {
+            minDistance = dist;
+          }
+        }
+
+        // Update the best point if this has a larger minimum distance
+        if (minDistance > maxMinDistance) {
+          maxMinDistance = minDistance;
+          bestPoint = { x, y };
+        }
+      }
+    }
+
+    if (this.points.length < 20 || Math.random() < 0.4) {
+      bestPoint.x += ((Math.random() - 0.5) * 1.8 * xShift);
+      bestPoint.y += ((Math.random() - 0.5) * 1.8 * yShift);
+    }
+
+    return bestPoint;
+  }
+
   AddRandomPoints(numPoints = 1) {
     for (let i = 0; i < numPoints; i++) {
-      while (true) {
-        const x = Math.random() * this.Width();
-        const y = Math.random() * this.Height();
-        if (this.AddPoint(x, y, true)) {
-          break;
+      let p = this.findFurthestPoint();
+      if (p) {
+          this.AddPoint(p.x, p.y, false);
+      } else {
+        while (true) {
+          const x = Math.random() * this.Width();
+          const y = Math.random() * this.Height();
+          if (this.AddPoint(x, y, true)) {
+            break;
+          }
         }
       }
     }
@@ -174,131 +258,6 @@ class Canvas {
       });
 
       this.finalResult = this.steps[this.steps.length - 1];
-
-      //
-      // let finalResult = this.voronoi.compute(this.points, this.bbox);
-      //
-      // let yValues = this.points.map(point => {
-      //   return point.y;
-      // });
-      //
-      //
-      // yValues.sort((a, b) => {
-      //   return a - b;
-      // });
-      //
-      // let steps = yValues.map(y => {
-      //   return {
-      //     y: y,
-      //     step1: 0,
-      //     step2: 0,
-      //     circleEvents: [],
-      //     edges: [],
-      //     numArcs: 0
-      //   }
-      // })
-      //
-      // let lastsweepLine = -1;
-      // for (let i = 0; i <= finalResult.i; i++) {
-      //   let result = this.voronoi.computeStepByStep(this.points, this.bbox, i);
-      //   let st = steps.find(step => {
-      //       return Math.abs(step.y - result.sweepLine) < 0.001;
-      //   });
-      //   if (!st) {
-      //     st = steps.find(step => {
-      //       return Math.abs(step.y - lastsweepLine) < 0.001;
-      //     });
-      //   }
-      //   if (st) {
-      //     st.numArcs = Math.max(st.numArcs, result.beachlineArcs?.length ?? 0);
-      //     result.circleEvents?.forEach(circleEvent => {
-      //       if (!st.circleEvents.find(ce => {
-      //         return ce.x === circleEvent.x && ce.y === circleEvent.y && ce.radius === circleEvent.radius;
-      //       })) {
-      //         st.circleEvents.push({
-      //           x: circleEvent.x,
-      //           y: circleEvent.y,
-      //           radius: circleEvent.radius
-      //         });
-      //       }
-      //     });
-      //     if (result.sweepLine !== lastsweepLine) {
-      //       let s = steps.find(step => {
-      //         return step.y === result.sweepLine;
-      //       });
-      //       if (s) {
-      //         s.step1 = i;
-      //       }
-      //       if (lastsweepLine !== -1) {
-      //         steps.find(step => {
-      //           return step.y === lastsweepLine;
-      //         }).step2 = i - 1;
-      //       }
-      //       lastsweepLine = result.sweepLine;
-      //     }
-      //   }
-      // }
-      //
-      // let maxY = Math.max(...yValues);
-      //   let st = steps.find(step => {
-      //     return Math.abs(step.y - maxY) < 0.001;
-      //   });
-      //   if (st) {
-      //     finalResult.edges.forEach(edge => {
-      //         st.edges.push({
-      //           va: {
-      //             x: edge.va.x,
-      //             y: edge.va.y
-      //           },
-      //           vb: {
-      //             x: edge.vb.x,
-      //             y: edge.vb.y
-      //           }
-      //         });
-      //     })
-      //   }
-      //
-      // lastsweepLine = -1;
-      // for (let i = finalResult.i - 1; i >= 0; i--) {
-      //   let result = this.voronoi.computeStepByStep(this.points, this.bbox, i);
-      //   if (result.sweepLine !== lastsweepLine) {
-      //     lastsweepLine = result.sweepLine;
-      //     if (result.sweepLine !== maxY) {
-      //       let st = steps.find(step => {
-      //         return Math.abs(step.y - result.sweepLine) < 0.001;
-      //       });
-      //       if (st) {
-      //         result.edges.forEach(edge => {
-      //           if (!st.edges.find(e => {
-      //             return this.Equals(e.va.x, edge.va.x) && this.Equals(e.va.y, edge.va.y) && this.Equals(e.vb.x, edge.vb.x) && this.Equals(e.vb.y, edge.vb.y);
-      //             //e.va.x === edge.va.x && e.va.y === edge.va.y && e.vb.x === edge.vb.x && e.vb.y === edge.vb.y;
-      //           })) {
-      //             st.edges.push({
-      //               va: {
-      //                 x: edge.va.x,
-      //                 y: edge.va.y
-      //               },
-      //               vb: {
-      //                 x: edge.vb.x,
-      //                 y: edge.vb.y
-      //               }
-      //             });
-      //           } else {
-      //             console.log("Edge already exists.")
-      //           }
-      //         })
-      //       }
-      //     }
-      //   }
-      // }
-      //
-      // this.results = steps;
-
-      // if (!this.initialized) {
-      //   this.step = this.results.length - 1; //finalResult.i;
-      //   this.UpdateStep();
-      //   this.initialized = true;
-      // }
     } else {
       console.log("Not enough points to compute Voronoi diagram.");
     }
@@ -319,10 +278,6 @@ class Canvas {
     return this.steps?.find(s => {
         return s.step === step;
     });
-  }
-
-  Equals(a, b) {
-    return Math.abs(a - b) < 0.001;
   }
 
   DrawPoint(point, outlineColor = "black", fillColor = "blue") {
@@ -353,8 +308,7 @@ class Canvas {
   }
 
   ToggleInAlgorithm() {
-    this.inAlgorithm = !this.inAlgorithm;
-    this.step = -1;
+    this.SetIsInAlgorithm(!this.inAlgorithm);
   }
 
   DrawPoints() {
@@ -579,7 +533,9 @@ class Canvas {
   }
 
   PauseAutoPlay() {
-    this.interruptedAnimation = true;
+    if (this.isAutoPlaying) {
+      this.interruptedAnimation = true;
+    }
   }
 
   UpdateTable() {
@@ -606,10 +562,24 @@ class Canvas {
     let currentStep = this.step + (previous ? -1 : 1);
 
     if (currentStep <= -2 || lastStep <= -2 || currentStep > this.numSteps || lastStep > this.numSteps) {
+      if (autoPlay) {
+        this.SetIsAutoPlaying(false);
+        this.interruptedAnimation = false;
+      }
       this.ToggleInAlgorithm();
-      this.step = -1;
+      this.SetStep(-1);
       this.DrawCurrentState();
       return false;
+    }
+
+
+    if (autoPlay) {
+      if (this.interruptedAnimation) {
+        this.interruptedAnimation = false;
+        this.SetIsAutoPlaying(false);
+        return;
+      }
+      this.SetIsAutoPlaying(true);
     }
 
     let lastResult = this.GetResultAtStep(lastStep);
@@ -619,11 +589,10 @@ class Canvas {
     let currentSweepLine = currentResult.sweepLine;
 
 
-    this.step = currentStep;
+    this.SetStep(currentStep);
+    this.UpdateStep();
 
-
-
-    if (smooth && this.smoothTransitions) {
+    if (autoPlay || (smooth && this.smoothTransitions)) {
 
       if (lastSweepLine !== currentSweepLine) {
 
@@ -640,11 +609,14 @@ class Canvas {
 
       } else if (autoPlay) {
         requestAnimationFrame(() => this.NextTransition(true, true));
+        return;
       }
     }
-    this.UpdateStep();
     this.DrawCurrentState();
+  }
 
+  GetStep() {
+    return this.step;
   }
 
   DrawCurrentState() {
@@ -688,6 +660,7 @@ class Canvas {
   AnimateSweeplineAndBeachlines(valuesOfI, index, autoPlay) {
     if (this.interruptedAnimation) {
       this.interruptedAnimation = false;
+      this.SetIsAutoPlaying(false);
       return;
     }
     if (index >= valuesOfI.length) {
@@ -700,6 +673,7 @@ class Canvas {
     const frame = () => {
       if (this.interruptedAnimation) {
         this.interruptedAnimation = false;
+        this.SetIsAutoPlaying(false);
         return;
       }
       this.UpdateSweepLine(i);
